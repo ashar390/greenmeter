@@ -19,7 +19,7 @@ Browser interface  →  Application/API  →  SQL database
 What users see         Rules and validation   Permanent records
 ```
 
-Only the first layer is complete today. Building the project in layers keeps each learning step small enough to understand and test.
+The interface and database schema are complete today. The API connection between them is the next milestone. Building the project in layers keeps each learning step small enough to understand and test.
 
 ## 2. Current architecture
 
@@ -128,7 +128,7 @@ Important design decisions:
 
 ## 6. Planned database
 
-The next milestone will use **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**.
+The project uses **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**. The schema and migration now exist; the application will begin querying D1 in the next milestone.
 
 ### Why SQL?
 
@@ -215,6 +215,11 @@ Greenmeter/
 │   ├── layout.tsx        # Shared page wrapper and link-preview metadata
 │   ├── page.tsx          # Dashboard interface and current interactions
 │   └── globals.css       # Visual system and responsive styles
+├── db/
+│   └── schema.ts         # Typed definitions for the three SQL tables
+├── drizzle/
+│   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
+│   └── meta/             # Drizzle's migration history
 ├── docs/
 │   └── ARCHITECTURE.md   # This explanation
 ├── public/
@@ -225,7 +230,7 @@ Greenmeter/
 └── vite.config.ts        # Build and Cloudflare configuration
 ```
 
-The `db/` directory does not exist yet. It will be introduced in the database milestone along with the schema, migrations, and database dependency. Keeping unused scaffolding out of the first release makes the repository accurately reflect implemented work.
+The schema is deliberately separate from API code. `db/schema.ts` describes the intended database, while `drizzle/` records the exact SQL needed to create it. This makes schema changes reviewable and repeatable across local, test, and hosted databases.
 
 ## 10. Testing strategy
 
@@ -245,7 +250,7 @@ Each layer catches a different category of failure. More tests are not automatic
 We will build the project in this order:
 
 1. **Interface prototype — complete.** Confirm the information and workflow.
-2. **Database schema.** Define tables and generate the first migration.
+2. **Database schema — complete.** Define tables, constraints, indexes, and generate the first migration.
 3. **Read API.** Load records from SQL instead of hard-coded data.
 4. **Write API.** Validate and save manually entered records.
 5. **Calculation service.** Move totals and emissions formulas into testable functions.
@@ -257,6 +262,6 @@ This order minimizes hidden complexity. Authentication and cloud deployment matt
 
 ## 12. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard with form validation, derived cost calculations, data visualization, and automated render tests.
+You can currently say that you built a responsive React/TypeScript energy dashboard and designed a tested relational SQL schema with foreign keys, indexes, check constraints, and versioned migrations.
 
-Do **not** yet claim database persistence, REST APIs, Spring Boot, authentication, real utility integrations, or production carbon calculations. Those claims become valid only after their milestones are implemented and tested.
+Do **not** yet claim that the dashboard persists records, or claim REST APIs, Spring Boot, authentication, real utility integrations, or production carbon calculations. The schema exists, but no application code writes to it yet.

@@ -4,7 +4,7 @@ GreenMeter is a household utility dashboard for reviewing electricity, water, an
 
 ## Current milestone
 
-The current release is a frontend prototype built with React and TypeScript. Records added through the form are stored in React state and last only until the page is refreshed.
+The current release includes a frontend prototype plus the first versioned SQL schema. Records added through the form still use React state and last only until the page is refreshed; connecting the UI to the database is the next API milestone.
 
 Implemented:
 
@@ -15,10 +15,11 @@ Implemented:
 - Derived projected-cost calculation
 - Recent-records table
 - Automated production-render checks
+- Versioned D1/SQLite schema for households, usage records, and reduction goals
+- Database constraints, indexes, foreign keys, and schema tests
 
 Not implemented yet:
 
-- Permanent database storage
 - REST API endpoints
 - Authentication
 - Real utility-company integrations
@@ -53,4 +54,4 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a beginner-friendly explan
 
 ## Next milestone
 
-Define the SQL schema and replace temporary browser data with a tested API and persistent database.
+Build the usage-record API and replace temporary browser data with persisted D1 records.
