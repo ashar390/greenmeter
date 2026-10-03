@@ -1,17 +1,23 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-const migrationUrl = new URL("../drizzle/0000_initial_schema.sql", import.meta.url);
+const migrationsUrl = new URL("../drizzle/", import.meta.url);
 
 async function createDatabase() {
-  const migration = await readFile(migrationUrl, "utf8");
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
 
-  for (const statement of migration.split("--> statement-breakpoint")) {
-    if (statement.trim()) database.exec(statement);
+  const migrationFiles = (await readdir(migrationsUrl))
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+
+  for (const migrationFile of migrationFiles) {
+    const migration = await readFile(new URL(migrationFile, migrationsUrl), "utf8");
+    for (const statement of migration.split("--> statement-breakpoint")) {
+      if (statement.trim()) database.exec(statement);
+    }
   }
 
   return database;
@@ -45,7 +51,7 @@ test("usage records enforce valid amounts, costs, categories, and uniqueness", a
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  insert.run(householdId, "electricity", "2026-09-21", 18.4, "kWh", 261, "utility_sync");
+  insert.run(householdId, "electricity", "2026-09-21", 18.4, "kWh", 261, "demo_data");
 
   assert.throws(
     () => insert.run(householdId, "electricity", "2026-09-20", 0, "kWh", 0, "manual"),
@@ -62,6 +68,10 @@ test("usage records enforce valid amounts, costs, categories, and uniqueness", a
   assert.throws(
     () => insert.run(householdId, "electricity", "2026-09-21", 19.1, "kWh", 270, "manual"),
     /UNIQUE constraint failed/,
+  );
+  assert.throws(
+    () => insert.run(householdId, "gas", "2026-09-22", 1, "therms", 120, "invented"),
+    /usage_records_source_valid/,
   );
 
   database.close();

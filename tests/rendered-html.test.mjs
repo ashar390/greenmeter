@@ -54,7 +54,8 @@ test("includes production project metadata and assets", async () => {
   assert.match(page, /IntroSequence/);
   assert.match(intro, /greenmeter-intro-seen/);
   assert.match(dashboard, /Usage must be greater than zero/);
-  assert.match(dashboard, /Dashboard totals have been recalculated/);
+  assert.match(dashboard, /Record saved to the GreenMeter database/);
+  assert.match(dashboard, /\/api\/usage-records/);
   assert.doesNotMatch(`${page}${intro}${dashboard}`, /SkeletonPreview/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });

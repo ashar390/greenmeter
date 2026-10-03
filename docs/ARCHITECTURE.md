@@ -69,7 +69,7 @@ GreenMeter currently uses React for:
 
 - opening and closing the new-record form;
 - validating submitted values;
-- adding records to the table;
+- requesting and saving records through the API;
 - recalculating the projected bill; and
 - changing the selected reporting period.
 
@@ -80,9 +80,10 @@ GreenMeter currently uses React for:
 The project uses the familiar Next.js App Router file structure:
 
 - `app/layout.tsx` wraps every page and defines site metadata;
-- `app/page.tsx` is the `/` page;
+- `app/page.tsx` composes the intro and dashboard at `/`;
+- `app/dashboard/page.tsx` contains the dashboard client interface;
 - `app/globals.css` contains global styles; and
-- a future `app/api/.../route.ts` file will expose API endpoints.
+- `app/api/usage-records/route.ts` exposes the records API.
 
 The local build is handled by **vinext**, a Vite-based compatibility layer that packages the application for a Cloudflare Worker. Vite provides the fast local development and build process.
 
@@ -111,7 +112,7 @@ type UsageRecord = {
   amount: number;
   unit: string;
   cost: number;
-  source: "Manual" | "Utility sync";
+  source: "Manual" | "Demo data" | "Utility sync";
 };
 ```
 
@@ -126,9 +127,9 @@ Important design decisions:
 - `cost` is stored separately because prices differ by utility and rate plan.
 - `source` distinguishes user-entered data from imported data.
 
-## 6. Planned database
+## 6. Database
 
-The project uses **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**. The schema and migration now exist; the application will begin querying D1 in the next milestone.
+The project uses **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**. The application now initializes its local tables, seeds clearly labeled demonstration records, reads them through an API, and persists new manual records.
 
 ### Why SQL?
 
@@ -152,7 +153,7 @@ Usage records are structured and related. SQL is a good fit because it supports:
 
 Drizzle maps TypeScript code to SQL tables. It gives us type checking while still making the database schema and generated SQL visible. That is helpful for learning because it is not a complete abstraction over SQL.
 
-### Planned tables
+### Tables
 
 ```text
 households
@@ -169,15 +170,15 @@ reduction_goals
 
 Money will be stored as integer cents rather than decimal dollars. Integer storage avoids floating-point rounding errors such as `0.1 + 0.2` not being represented exactly by a computer.
 
-## 7. Planned request flow
+## 7. Request flow
 
-When the database milestone is complete, loading the dashboard will work like this:
+Loading the dashboard works like this:
 
 ```text
 1. Browser requests the dashboard
-2. React requests GET /api/usage
-3. API validates query parameters
-4. Drizzle sends a parameterized SQL query to D1
+2. React requests GET /api/usage-records
+3. The route calls the database helper
+4. Prepared SQL queries D1
 5. D1 returns usage rows
 6. API converts rows to JSON
 7. React renders the returned records and calculated totals
@@ -186,7 +187,7 @@ When the database milestone is complete, loading the dashboard will work like th
 Adding a record will work like this:
 
 ```text
-Form → client validation → POST /api/usage → server validation
+Form → client validation → POST /api/usage-records → server validation
      → SQL insert → saved record returned → table updates
 ```
 
@@ -213,10 +214,14 @@ The result is intentionally quieter and more information-dense. A real product n
 Greenmeter/
 ├── app/
 │   ├── layout.tsx        # Shared page wrapper and link-preview metadata
-│   ├── page.tsx          # Dashboard interface and current interactions
+│   ├── page.tsx          # Root composition: intro followed by dashboard
+│   ├── intro-sequence.tsx
+│   ├── dashboard/page.tsx
+│   ├── api/usage-records/route.ts
 │   └── globals.css       # Visual system and responsive styles
 ├── db/
-│   └── schema.ts         # Typed definitions for the three SQL tables
+│   ├── schema.ts         # Typed definitions for the three SQL tables
+│   └── usage-records.ts  # Prepared queries and row-to-API mapping
 ├── drizzle/
 │   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
 │   └── meta/             # Drizzle's migration history
@@ -251,8 +256,8 @@ We will build the project in this order:
 
 1. **Interface prototype — complete.** Confirm the information and workflow.
 2. **Database schema — complete.** Define tables, constraints, indexes, and generate the first migration.
-3. **Read API.** Load records from SQL instead of hard-coded data.
-4. **Write API.** Validate and save manually entered records.
+3. **Read API — complete.** Load records from SQL instead of hard-coded data.
+4. **Write API — complete.** Validate and save manually entered records.
 5. **Calculation service.** Move totals and emissions formulas into testable functions.
 6. **Error/loading states.** Handle slow or failed requests honestly.
 7. **Authentication.** Associate private records with a user only after core data flows work.
@@ -262,6 +267,6 @@ This order minimizes hidden complexity. Authentication and cloud deployment matt
 
 ## 12. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard and designed a tested relational SQL schema with foreign keys, indexes, check constraints, and versioned migrations.
+You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, and implemented a REST-style API that validates, reads, and persists usage records in Cloudflare D1.
 
-Do **not** yet claim that the dashboard persists records, or claim REST APIs, Spring Boot, authentication, real utility integrations, or production carbon calculations. The schema exists, but no application code writes to it yet.
+Do **not** yet claim Spring Boot, authentication, real utility integrations, or production carbon calculations. The current provider rows are demonstration data, and new records are manually entered.

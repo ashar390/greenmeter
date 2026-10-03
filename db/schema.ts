@@ -22,7 +22,7 @@ export const usageRecords = sqliteTable("usage_records", {
   amount: real("amount").notNull(),
   unit: text("unit", { enum: ["kWh", "therms", "gal"] }).notNull(),
   costCents: integer("cost_cents").notNull(),
-  source: text("source", { enum: ["manual", "utility_sync"] }).notNull().default("manual"),
+  source: text("source", { enum: ["manual", "demo_data", "utility_sync"] }).notNull().default("manual"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("usage_records_household_date_idx").on(table.householdId, table.readingDate),
@@ -35,7 +35,7 @@ export const usageRecords = sqliteTable("usage_records", {
   check("usage_records_amount_positive", sql`${table.amount} > 0`),
   check("usage_records_unit_valid", sql`${table.unit} in ('kWh', 'therms', 'gal')`),
   check("usage_records_cost_nonnegative", sql`${table.costCents} >= 0`),
-  check("usage_records_source_valid", sql`${table.source} in ('manual', 'utility_sync')`),
+  check("usage_records_source_valid", sql`${table.source} in ('manual', 'demo_data', 'utility_sync')`),
   check("usage_records_date_iso", sql`${table.readingDate} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
 ]);
 

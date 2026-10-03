@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Utility = "Electricity" | "Gas" | "Water";
@@ -12,22 +12,16 @@ type UsageRecord = {
   amount: number;
   unit: string;
   cost: number;
-  source: "Manual" | "Demo data";
+  source: "Manual" | "Demo data" | "Utility sync";
 };
-
-const initialRecords: UsageRecord[] = [
-  { id: 1, date: "2026-09-18", category: "Electricity", amount: 18.4, unit: "kWh", cost: 2.61, source: "Demo data" },
-  { id: 2, date: "2026-09-17", category: "Electricity", amount: 21.2, unit: "kWh", cost: 3.01, source: "Demo data" },
-  { id: 3, date: "2026-09-16", category: "Gas", amount: 0.8, unit: "therms", cost: 1.12, source: "Manual" },
-  { id: 4, date: "2026-09-15", category: "Water", amount: 126, unit: "gal", cost: 0.74, source: "Demo data" },
-  { id: 5, date: "2026-09-14", category: "Electricity", amount: 16.7, unit: "kWh", cost: 2.37, source: "Demo data" },
-];
 
 const usageByDay = [15.8, 18.2, 16.1, 21.4, 19.7, 24.1, 17.9, 16.8, 18.6, 17.3, 20.1, 16.4, 15.9, 18.1];
 const dayLabels = ["Sep 8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"];
 
 export default function Home() {
-  const [records, setRecords] = useState(initialRecords);
+  const [records, setRecords] = useState<UsageRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(true);
+  const [savingRecord, setSavingRecord] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState("");
   const [period, setPeriod] = useState("Current billing cycle");
@@ -37,9 +31,31 @@ export default function Home() {
     [records],
   );
 
-  function addRecord(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadRecords() {
+      try {
+        const response = await fetch("/api/usage-records", { signal: controller.signal });
+        const data = await response.json() as { records?: UsageRecord[]; error?: string };
+        if (!response.ok || !data.records) throw new Error(data.error ?? "Usage records could not be loaded.");
+        setRecords(data.records);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setNotice(error instanceof Error ? error.message : "Usage records could not be loaded.");
+      } finally {
+        if (!controller.signal.aborted) setLoadingRecords(false);
+      }
+    }
+
+    loadRecords();
+    return () => controller.abort();
+  }, []);
+
+  async function addRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const category = form.get("category") as Utility;
     const amount = Number(form.get("amount"));
     const cost = Number(form.get("cost"));
@@ -49,19 +65,32 @@ export default function Home() {
       return;
     }
 
-    const unit = category === "Electricity" ? "kWh" : category === "Gas" ? "therms" : "gal";
-    setRecords((current) => [{
-      id: Date.now(),
-      date: String(form.get("date")),
-      category,
-      amount,
-      cost,
-      unit,
-      source: "Manual",
-    }, ...current]);
-    setNotice("Record added. Dashboard totals have been recalculated for this session.");
-    event.currentTarget.reset();
-    setShowForm(false);
+    setSavingRecord(true);
+    setNotice("");
+
+    try {
+      const response = await fetch("/api/usage-records", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          date: String(form.get("date")),
+          category,
+          amount,
+          cost,
+        }),
+      });
+      const data = await response.json() as { record?: UsageRecord; error?: string };
+      if (!response.ok || !data.record) throw new Error(data.error ?? "The record could not be saved.");
+
+      setRecords((current) => [data.record!, ...current]);
+      setNotice("Record saved to the GreenMeter database.");
+      formElement.reset();
+      setShowForm(false);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The record could not be saved.");
+    } finally {
+      setSavingRecord(false);
+    }
   }
 
   return (
@@ -205,11 +234,11 @@ export default function Home() {
           </div>
           {showForm && (
             <form className="record-form" onSubmit={addRecord}>
-              <label>Date<input name="date" type="date" defaultValue="2026-09-21" required /></label>
+              <label>Date<input name="date" type="date" defaultValue="2026-10-03" required /></label>
               <label>Utility<select name="category"><option>Electricity</option><option>Gas</option><option>Water</option></select></label>
               <label>Usage<input name="amount" type="number" min="0.01" step="0.01" placeholder="18.5" required /></label>
               <label>Cost ($)<input name="cost" type="number" min="0" step="0.01" placeholder="2.63" required /></label>
-              <button className="primary-button" type="submit">Save record</button>
+              <button className="primary-button" type="submit" disabled={savingRecord}>{savingRecord ? "Saving…" : "Save record"}</button>
             </form>
           )}
           {notice && <p className="notice" role="status">{notice}</p>}
@@ -217,6 +246,8 @@ export default function Home() {
             <table>
               <thead><tr><th>Date</th><th>Utility</th><th>Usage</th><th>Cost</th><th>Source</th></tr></thead>
               <tbody>
+                {loadingRecords && <tr><td className="table-message" colSpan={5}>Loading usage records…</td></tr>}
+                {!loadingRecords && records.length === 0 && <tr><td className="table-message" colSpan={5}>No readings yet. Add your first usage record.</td></tr>}
                 {records.slice(0, 6).map((record) => (
                   <tr key={record.id}>
                     <td>{new Date(`${record.date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
