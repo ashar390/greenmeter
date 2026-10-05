@@ -97,13 +97,14 @@ select:focus, input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .chart-summary strong { font-size: 14px; }
 .chart { display: grid; grid-template-columns: 26px 1fr; height: 245px; padding-top: 24px; }
 .axis-labels { display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 27px; color: #8a958f; font-size: 9px; }
-.chart-plot { position: relative; display: grid; grid-template-columns: repeat(14, 1fr); align-items: end; gap: 7px; border-bottom: 1px solid var(--line-strong); background: repeating-linear-gradient(to bottom, transparent 0, transparent 48px, #edf0ee 49px); }
+.chart-plot { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(24px, 1fr); align-items: end; gap: 7px; overflow-x: auto; border-bottom: 1px solid var(--line-strong); background: repeating-linear-gradient(to bottom, transparent 0, transparent 48px, #edf0ee 49px); }
 .chart-column { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; position: relative; z-index: 2; }
 .chart-bar { width: min(22px, 72%); min-height: 4px; background: var(--green); border-radius: 2px 2px 0 0; }
 .chart-bar:hover { background: var(--green-dark); }
 .chart-column small { height: 18px; color: #7f8a84; font-size: 8px; white-space: nowrap; }
 .average-line { position: absolute; left: 0; right: 0; bottom: 62.3%; border-top: 1px dashed #89968f; z-index: 1; }
 .average-line span { position: absolute; right: 0; top: -17px; padding-left: 6px; background: #fff; color: #79857f; font-size: 8px; }
+.chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
 .side-stack { display: grid; gap: 18px; align-content: start; }
 .compact { align-items: center; }
 .status-badge { padding: 4px 7px; background: var(--green-light); color: var(--green-dark); border-radius: 4px; font-size: 9px; font-weight: 650; }

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { calculateDashboardSummary, type ReportingPeriod } from "../../lib/dashboard-summary";
 
 type Utility = "Electricity" | "Gas" | "Water";
 
@@ -15,8 +16,14 @@ type UsageRecord = {
   source: "Manual" | "Demo data" | "Utility sync";
 };
 
-const usageByDay = [15.8, 18.2, 16.1, 21.4, 19.7, 24.1, 17.9, 16.8, 18.6, 17.3, 20.1, 16.4, 15.9, 18.1];
-const dayLabels = ["Sep 8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"];
+function comparisonLabel(change: number | null) {
+  if (change === null) return { className: "", text: "No previous data" };
+  if (Math.abs(change) < 0.05) return { className: "", text: "No change" };
+  return {
+    className: change < 0 ? "positive" : "negative",
+    text: `${Math.abs(change).toFixed(1)}% ${change < 0 ? "lower" : "higher"}`,
+  };
+}
 
 export default function Home() {
   const [records, setRecords] = useState<UsageRecord[]>([]);
@@ -24,12 +31,15 @@ export default function Home() {
   const [savingRecord, setSavingRecord] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState("");
-  const [period, setPeriod] = useState("Current billing cycle");
+  const [period, setPeriod] = useState<ReportingPeriod>("current");
 
-  const recordedCost = useMemo(
-    () => records.reduce((sum, record) => sum + record.cost, 0),
-    [records],
-  );
+  const summary = useMemo(() => calculateDashboardSummary(records, period), [records, period]);
+  const electricityComparison = comparisonLabel(summary.electricity.changePercent);
+  const waterComparison = comparisonLabel(summary.water.changePercent);
+  const gasComparison = comparisonLabel(summary.gas.changePercent);
+  const achievedReduction = summary.electricity.changePercent === null
+    ? null
+    : Math.max(0, -summary.electricity.changePercent);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,10 +135,10 @@ export default function Home() {
           </div>
           <div className="page-controls">
             <label htmlFor="period">Reporting period</label>
-            <select id="period" value={period} onChange={(event) => setPeriod(event.target.value)}>
-              <option>Current billing cycle</option>
-              <option>Previous billing cycle</option>
-              <option>Last 12 months</option>
+            <select id="period" value={period} onChange={(event) => setPeriod(event.target.value as ReportingPeriod)}>
+              <option value="current">Latest recorded month</option>
+              <option value="previous">Previous month</option>
+              <option value="last12">Last 12 months</option>
             </select>
           </div>
         </section>
@@ -136,60 +146,61 @@ export default function Home() {
         <section className="billing-strip" aria-label="Billing cycle status">
           <div>
             <span className="status-dot" />
-            <div><strong>Current billing cycle</strong><span>September 1–30 · 9 days remaining</span></div>
+            <div><strong>{summary.periodLabel}</strong><span>{summary.dateRangeLabel} · {summary.daysRecorded} days reported</span></div>
           </div>
-          <div className="billing-progress" aria-label="70 percent of billing cycle complete"><span /></div>
-          <div className="bill-estimate"><span>Projected bill</span><strong>${(62.4 + recordedCost).toFixed(2)}</strong></div>
+          <div className="billing-progress" aria-label={`${summary.reportingProgress.toFixed(0)} percent of days have readings`}><span style={{ width: `${summary.reportingProgress}%` }} /></div>
+          <div className="bill-estimate"><span>Recorded cost</span><strong>${summary.totalCost.toFixed(2)}</strong></div>
         </section>
 
         <section className="impact-note" aria-label="Current sustainability insight">
-          <div className="impact-number">11<span>kg</span></div>
-          <div><strong>Emissions are trending lower</strong><p>Your current estimate is 11 kg CO₂e below the previous billing cycle.</p></div>
-          <a href="#recommendations">View details <span aria-hidden="true">→</span></a>
+          <div className="impact-number">—</div>
+          <div><strong>Emissions estimate not configured</strong><p>Usage totals are live. A documented emissions-factor service is the next calculation layer.</p></div>
+          <a href="#records">View source data <span aria-hidden="true">→</span></a>
         </section>
 
         <section className="summary-grid" aria-label="Utility summary">
           <article className="summary-card">
             <div className="summary-label"><span className="utility-mark electricity" />Electricity</div>
-            <div className="summary-value">412 <small>kWh</small></div>
-            <div className="summary-meta"><span className="positive">8.2% lower</span><span>than last cycle</span></div>
+            <div className="summary-value">{summary.electricity.amount.toLocaleString()} <small>{summary.electricity.unit}</small></div>
+            <div className="summary-meta"><span className={electricityComparison.className}>{electricityComparison.text}</span><span>{summary.electricity.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
           <article className="summary-card">
             <div className="summary-label"><span className="utility-mark water" />Water</div>
-            <div className="summary-value">2,840 <small>gal</small></div>
-            <div className="summary-meta"><span className="positive">5.1% lower</span><span>than last cycle</span></div>
+            <div className="summary-value">{summary.water.amount.toLocaleString()} <small>{summary.water.unit}</small></div>
+            <div className="summary-meta"><span className={waterComparison.className}>{waterComparison.text}</span><span>{summary.water.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
           <article className="summary-card">
             <div className="summary-label"><span className="utility-mark gas" />Natural gas</div>
-            <div className="summary-value">18.3 <small>therms</small></div>
-            <div className="summary-meta"><span className="negative">2.4% higher</span><span>than last cycle</span></div>
+            <div className="summary-value">{summary.gas.amount.toLocaleString()} <small>{summary.gas.unit}</small></div>
+            <div className="summary-meta"><span className={gasComparison.className}>{gasComparison.text}</span><span>{summary.gas.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
           <article className="summary-card">
             <div className="summary-label">Estimated emissions</div>
-            <div className="summary-value">146 <small>kg CO₂e</small></div>
-            <div className="summary-meta"><span className="positive">11 kg lower</span><span>than last cycle</span></div>
+            <div className="summary-value">— <small>kg CO₂e</small></div>
+            <div className="summary-meta"><span>Calculation not configured</span></div>
           </article>
         </section>
 
         <section className="content-grid" id="usage">
           <article className="card usage-card">
             <div className="card-header">
-              <div><h2>Electricity usage</h2><p>Daily consumption for the current billing cycle</p></div>
-              <div className="legend"><span /><span>Daily usage</span><i />30-day average</div>
+              <div><h2>Electricity usage</h2><p>Recorded consumption for {summary.dateRangeLabel}</p></div>
+              <div className="legend"><span /><span>Recorded usage</span><i />Period average</div>
             </div>
             <div className="chart-summary">
-              <div><span>Cycle total</span><strong>412 kWh</strong></div>
-              <div><span>Daily average</span><strong>18.7 kWh</strong></div>
-              <div><span>Highest day</span><strong>24.1 kWh</strong></div>
+              <div><span>Period total</span><strong>{summary.electricity.amount.toLocaleString()} kWh</strong></div>
+              <div><span>Recorded-day average</span><strong>{summary.electricityAverage === null ? "—" : `${summary.electricityAverage} kWh`}</strong></div>
+              <div><span>Highest recorded day</span><strong>{summary.electricityHighest === null ? "—" : `${summary.electricityHighest} kWh`}</strong></div>
             </div>
-            <div className="chart" aria-label="Electricity consumption for September 8 through September 21">
-              <div className="axis-labels"><span>30</span><span>20</span><span>10</span><span>0</span></div>
+            <div className="chart" aria-label={`Electricity consumption for ${summary.dateRangeLabel}`}>
+              <div className="axis-labels"><span>{summary.chartMaximum}</span><span>{Math.round(summary.chartMaximum * .67)}</span><span>{Math.round(summary.chartMaximum * .33)}</span><span>0</span></div>
               <div className="chart-plot">
-                <div className="average-line"><span>Average 18.7</span></div>
-                {usageByDay.map((value, index) => (
-                  <div className="chart-column" key={`${dayLabels[index]}-${value}`}>
-                    <div className="chart-bar" style={{ height: `${(value / 30) * 100}%` }} title={`${dayLabels[index]}: ${value} kWh`} />
-                    <small>{dayLabels[index]}</small>
+                {summary.electricityAverage !== null && <div className="average-line" style={{ bottom: `${(summary.electricityAverage / summary.chartMaximum) * 100}%` }}><span>Average {summary.electricityAverage}</span></div>}
+                {summary.electricityDays.length === 0 && <div className="chart-empty">No electricity readings for this period</div>}
+                {summary.electricityDays.map((day) => (
+                  <div className="chart-column" key={day.date}>
+                    <div className="chart-bar" style={{ height: `${(day.amount / summary.chartMaximum) * 100}%` }} title={`${day.label}: ${day.amount} kWh`} />
+                    <small>{day.label}</small>
                   </div>
                 ))}
               </div>
@@ -198,31 +209,31 @@ export default function Home() {
 
           <aside className="side-stack">
             <article className="card goal-card">
-              <div className="card-header compact"><div><h2>Monthly target</h2><p>10% electricity reduction</p></div><span className="status-badge">On track</span></div>
-              <div className="target-row"><strong>7.4%</strong><span>reduction achieved</span></div>
-              <div className="progress-track"><span /></div>
+              <div className="card-header compact"><div><h2>Monthly target</h2><p>10% electricity reduction</p></div>{achievedReduction !== null && <span className="status-badge">{achievedReduction >= 10 ? "Reached" : "In progress"}</span>}</div>
+              <div className="target-row"><strong>{achievedReduction === null ? "—" : `${achievedReduction.toFixed(1)}%`}</strong><span>{achievedReduction === null ? "Previous-period data needed" : "reduction achieved"}</span></div>
+              <div className="progress-track"><span style={{ width: `${achievedReduction === null ? 0 : Math.min(100, achievedReduction * 10)}%` }} /></div>
               <div className="target-scale"><span>0%</span><span>Target: 10%</span></div>
             </article>
             <article className="card emissions-card">
-              <h2>How emissions are estimated</h2>
-              <p>We multiply your recorded utility usage by standard emissions factors. This is an estimate, not a utility measurement.</p>
-              <button className="link-button">View calculation details</button>
+              <h2>Why emissions are unavailable</h2>
+              <p>GreenMeter needs documented electricity, gas, and water factors before it can calculate a defensible estimate.</p>
+              <button className="link-button">Calculation layer coming next</button>
             </article>
           </aside>
         </section>
 
         <section className="card recommendations" id="recommendations">
-          <div className="card-header"><div><h2>Usage alerts and recommendations</h2><p>Based on patterns in the current billing cycle</p></div></div>
+          <div className="card-header"><div><h2>Usage observations</h2><p>Based on the records available for the selected period</p></div></div>
           <div className="recommendation-list">
             <div className="recommendation-row">
-              <span className="recommendation-type alert">Alert</span>
-              <div><strong>Evening electricity usage increased</strong><p>Usage between 6 PM and 9 PM is 11% higher than your previous billing cycle.</p></div>
-              <button className="secondary-button">Review usage</button>
+              <span className={`recommendation-type ${summary.electricity.changePercent !== null && summary.electricity.changePercent > 0 ? "alert" : ""}`}>{summary.electricity.changePercent === null ? "Status" : "Trend"}</span>
+              <div><strong>{summary.electricity.changePercent === null ? "More history is needed" : summary.electricity.changePercent > 0 ? "Electricity usage increased" : "Electricity usage decreased"}</strong><p>{summary.electricity.changePercent === null ? "Add readings for an earlier month to unlock period-over-period comparisons." : `Recorded electricity usage is ${Math.abs(summary.electricity.changePercent).toFixed(1)}% ${summary.electricity.changePercent > 0 ? "higher" : "lower"} than the prior period.`}</p></div>
+              <button className="secondary-button" onClick={() => document.querySelector("#records")?.scrollIntoView()}>Review records</button>
             </div>
             <div className="recommendation-row">
               <span className="recommendation-type">Tip</span>
-              <div><strong>Move dishwasher runs outside peak hours</strong><p>Running after 8 PM may reduce time-of-use charges on eligible plans.</p></div>
-              <button className="secondary-button">Learn more</button>
+              <div><strong>Consistent readings improve comparisons</strong><p>Record each utility on the same schedule so monthly totals represent similar time spans.</p></div>
+              <button className="secondary-button" onClick={() => setShowForm(true)}>Add reading</button>
             </div>
           </div>
         </section>
