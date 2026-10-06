@@ -1,5 +1,5 @@
 export type UtilityType = "electricity" | "gas" | "water";
-export type UsageSource = "manual" | "demo_data" | "utility_sync";
+export type UsageSource = "manual" | "demo_data" | "utility_sync" | "csv_import";
 
 export type UsageRecordDto = {
   id: number;
@@ -8,7 +8,7 @@ export type UsageRecordDto = {
   amount: number;
   unit: "kWh" | "therms" | "gal";
   cost: number;
-  source: "Manual" | "Demo data" | "Utility sync";
+  source: "Manual" | "Demo data" | "Utility sync" | "CSV import";
 };
 
 export type NewUsageRecordInput = {
@@ -37,6 +37,7 @@ const sourceLabels = {
   manual: "Manual",
   demo_data: "Demo data",
   utility_sync: "Utility sync",
+  csv_import: "CSV import",
 } as const;
 
 type UsageRow = {
@@ -91,7 +92,7 @@ export async function ensureUsageDatabase(database: D1Database) {
         CONSTRAINT usage_records_amount_positive CHECK(amount > 0),
         CONSTRAINT usage_records_unit_valid CHECK(unit in ('kWh', 'therms', 'gal')),
         CONSTRAINT usage_records_cost_nonnegative CHECK(cost_cents >= 0),
-        CONSTRAINT usage_records_source_valid CHECK(source in ('manual', 'demo_data', 'utility_sync')),
+        CONSTRAINT usage_records_source_valid CHECK(source in ('manual', 'demo_data', 'utility_sync', 'csv_import')),
         CONSTRAINT usage_records_date_iso CHECK(reading_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
         UNIQUE(household_id, utility_type, reading_date)
       )
@@ -197,4 +198,29 @@ export async function insertUsageRecord(
 
   if (!result) throw new Error("The usage record was not saved.");
   return toDto(result);
+}
+
+export async function insertUsageRecords(
+  database: D1Database,
+  inputs: NewUsageRecordInput[],
+  ownerEmail: string,
+  ownerName?: string,
+) {
+  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
+  if (inputs.length === 0) return [];
+
+  await database.batch(inputs.map((input) => database.prepare(`
+    INSERT INTO usage_records
+      (household_id, utility_type, reading_date, amount, unit, cost_cents, source)
+    VALUES (?, ?, ?, ?, ?, ?, 'csv_import')
+  `).bind(
+    householdId,
+    input.category,
+    input.date,
+    input.amount,
+    units[input.category],
+    input.costCents,
+  )));
+
+  return listUsageRecords(database, ownerEmail, ownerName);
 }

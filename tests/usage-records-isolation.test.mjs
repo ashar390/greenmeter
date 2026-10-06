@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { insertUsageRecord, listUsageRecords } from "../db/usage-records.ts";
+import { insertUsageRecord, insertUsageRecords, listUsageRecords } from "../db/usage-records.ts";
 
 const migrationsUrl = new URL("../drizzle/", import.meta.url);
 
@@ -68,6 +68,21 @@ test("authenticated households cannot read each other's usage records", async ()
   assert.deepEqual(firstRecords.map((record) => record.amount), [12.5]);
   assert.deepEqual(secondRecords.map((record) => record.amount), [27.2]);
   assert.equal(demoRecords.length, 5);
+
+  sqlite.close();
+});
+
+test("bulk imports are attributed to the authenticated household and CSV source", async () => {
+  const { sqlite, database } = await createD1Adapter();
+
+  const records = await insertUsageRecords(database, [
+    { date: "2026-10-01", category: "electricity", amount: 15, costCents: 210 },
+    { date: "2026-10-02", category: "water", amount: 120, costCents: 70 },
+  ], "importer@example.com", "Import User");
+
+  assert.equal(records.length, 2);
+  assert.deepEqual(records.map((record) => record.source), ["CSV import", "CSV import"]);
+  assert.equal((await listUsageRecords(database, "another@example.com", "Another User")).length, 0);
 
   sqlite.close();
 });

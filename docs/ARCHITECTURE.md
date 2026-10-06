@@ -262,12 +262,13 @@ We will build the project in this order:
 6. **Error/loading states — complete.** Handle slow, empty, incomplete, or failed requests honestly.
 7. **Emissions service — complete.** Estimate electricity and gas emissions with documented EPA factors and explicit exclusions.
 8. **Authentication and authorization — complete.** Keep the demo public and read-only while scoping authenticated API operations to the signed-in household.
-9. **Deployment and observability.** Publish, log errors, and measure health.
+9. **CSV import — complete.** Preview, validate, and atomically persist authenticated bulk utility records with provenance.
+10. **Deployment and observability.** Publish, log errors, and measure health.
 
 This order minimizes hidden complexity. Authentication was added after the data flow so its authorization boundaries could be tested independently.
 
 ## 12. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, and created unit-tested services for period analytics and EPA-based carbon estimates.
+You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, added a validated bulk CSV ingestion workflow, and created unit-tested services for period analytics and EPA-based carbon estimates.
 
 Do **not** yet claim Spring Boot, real utility integrations, water emissions, or utility-certified carbon accounting. Public provider rows are demonstration data, and authenticated records are manually entered.

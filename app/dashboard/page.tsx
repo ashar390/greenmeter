@@ -14,13 +14,19 @@ type UsageRecord = {
   amount: number;
   unit: string;
   cost: number;
-  source: "Manual" | "Demo data" | "Utility sync";
+  source: "Manual" | "Demo data" | "Utility sync" | "CSV import";
 };
 
 type Session = {
   authenticated: boolean;
   mode: "demo" | "personal";
   user: { email: string; displayName: string } | null;
+};
+
+type ImportPreview = {
+  rows: Array<{ date: string; category: string; amount: number; costCents: number }>;
+  errors: Array<{ row: number; message: string }>;
+  totalRows: number;
 };
 
 const signInPath = "/signin-with-chatgpt?return_to=%2Fdashboard";
@@ -42,6 +48,11 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [period, setPeriod] = useState<ReportingPeriod>("current");
   const [session, setSession] = useState<Session>({ authenticated: false, mode: "demo", user: null });
+  const [showImport, setShowImport] = useState(false);
+  const [importCsv, setImportCsv] = useState("");
+  const [importFileName, setImportFileName] = useState("");
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const summary = useMemo(() => calculateDashboardSummary(records, period), [records, period]);
   const electricityComparison = comparisonLabel(summary.electricity.changePercent);
@@ -121,6 +132,60 @@ export default function Home() {
       setNotice(error instanceof Error ? error.message : "The record could not be saved.");
     } finally {
       setSavingRecord(false);
+    }
+  }
+
+  async function previewImport(file: File) {
+    setImportFileName(file.name);
+    setImportPreview(null);
+    setNotice("");
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setNotice("Choose a .csv file using the GreenMeter template.");
+      return;
+    }
+
+    const csv = await file.text();
+    setImportCsv(csv);
+    setImporting(true);
+    try {
+      const response = await fetch("/api/usage-records/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ csv, confirm: false }),
+      });
+      const data = await response.json() as ImportPreview & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "The CSV could not be previewed.");
+      setImportPreview(data);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The CSV could not be previewed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (!importPreview || importPreview.errors.length > 0 || importPreview.rows.length === 0) return;
+    setImporting(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/usage-records/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ csv: importCsv, confirm: true }),
+      });
+      const data = await response.json() as { imported?: number; records?: UsageRecord[]; error?: string };
+      if (!response.ok || !data.records) throw new Error(data.error ?? "The CSV could not be imported.");
+      setRecords(data.records);
+      setNotice(`${data.imported} records imported successfully.`);
+      setShowImport(false);
+      setImportCsv("");
+      setImportFileName("");
+      setImportPreview(null);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The CSV could not be imported.");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -276,10 +341,35 @@ export default function Home() {
         <section className="card records-card" id="records">
           <div className="card-header">
             <div><h2>Recent usage records</h2><p>Demonstration and manually entered utility readings</p></div>
-            {session.authenticated
-              ? <button className="primary-button" onClick={() => setShowForm((current) => !current)}>{showForm ? "Cancel" : "Add record"}</button>
-              : <a className="primary-button" href={signInPath}>Sign in to add records</a>}
+            {session.authenticated ? (
+              <div className="record-actions">
+                <button className="secondary-button" onClick={() => { setShowImport((current) => !current); setShowForm(false); }}>{showImport ? "Close import" : "Import CSV"}</button>
+                <button className="primary-button" onClick={() => { setShowForm((current) => !current); setShowImport(false); }}>{showForm ? "Cancel" : "Add record"}</button>
+              </div>
+            ) : <a className="primary-button" href={signInPath}>Sign in to add records</a>}
           </div>
+          {showImport && (
+            <section className="import-panel" aria-label="Import utility records">
+              <div className="import-copy">
+                <strong>Import utility history</strong>
+                <p>Use columns <code>date, utility, usage, cost</code>. Dates must use YYYY-MM-DD; utility must be electricity, gas, or water.</p>
+                <a href="/greenmeter-import-template.csv" download>Download CSV template</a>
+              </div>
+              <label className="file-picker">
+                <span>{importFileName || "Choose a CSV file"}</span>
+                <input type="file" accept=".csv,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void previewImport(file); }} />
+              </label>
+              {importing && <p className="import-status" role="status">Checking file…</p>}
+              {importPreview && (
+                <div className={`import-result ${importPreview.errors.length ? "has-errors" : ""}`}>
+                  <strong>{importPreview.errors.length ? `${importPreview.errors.length} issues found` : `${importPreview.rows.length} records ready to import`}</strong>
+                  <span>{importPreview.totalRows} data rows checked</span>
+                  {importPreview.errors.length > 0 && <ul>{importPreview.errors.slice(0, 8).map((error, index) => <li key={`${error.row}-${index}`}>Row {error.row}: {error.message}</li>)}</ul>}
+                  {importPreview.errors.length === 0 && <button className="primary-button" disabled={importing} onClick={() => void confirmImport()}>{importing ? "Importing…" : `Import ${importPreview.rows.length} records`}</button>}
+                </div>
+              )}
+            </section>
+          )}
           {showForm && (
             <form className="record-form" onSubmit={addRecord}>
               <label>Date<input name="date" type="date" defaultValue="2026-10-03" required /></label>

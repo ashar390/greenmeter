@@ -19,11 +19,12 @@ Implemented:
 - EPA-based electricity and natural-gas emissions estimates
 - Public read-only demonstration mode
 - Authenticated household workspaces with server-side record isolation
+- Validated CSV import with preview, row-level errors, and source tracking
 - Unit, schema, and production-render tests
 
 Not implemented yet:
 
-- Real utility-company integrations
+- Direct utility-company API integrations
 - Water emissions calculations
 - Public production deployment
 
@@ -64,4 +65,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Add a production-ready data-import workflow, then publish the production deployment.
+Add deployment observability and end-to-end production checks.

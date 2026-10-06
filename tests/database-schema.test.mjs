@@ -95,6 +95,8 @@ test("usage records enforce valid amounts, costs, categories, and uniqueness", a
     /usage_records_source_valid/,
   );
 
+  insert.run(householdId, "gas", "2026-09-22", 1, "therms", 120, "csv_import");
+
   database.close();
 });
 
