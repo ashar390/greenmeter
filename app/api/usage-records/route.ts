@@ -1,4 +1,5 @@
 import { insertUsageRecord, listUsageRecords, type UtilityType } from "../../../db/usage-records";
+import { getRequestUser } from "../../../lib/request-user";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,11 @@ function isIsoDate(value: unknown): value is string {
   return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const records = await listUsageRecords(await getDatabase());
-    return Response.json({ records });
+    const user = getRequestUser(request);
+    const records = await listUsageRecords(await getDatabase(), user?.email, user?.displayName);
+    return Response.json({ records, mode: user ? "personal" : "demo" });
   } catch (error) {
     console.error("Unable to load usage records", error);
     return Response.json({ error: "Usage records are temporarily unavailable." }, { status: 500 });
@@ -27,6 +29,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = getRequestUser(request);
+    if (!user) {
+      return Response.json(
+        { error: "Sign in to add records to a private household." },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json() as Record<string, unknown>;
     const category = typeof body.category === "string" ? body.category.toLowerCase() : "";
     const amount = Number(body.amount);
@@ -50,7 +60,7 @@ export async function POST(request: Request) {
       category: category as UtilityType,
       amount,
       costCents: Math.round(cost * 100),
-    });
+    }, user.email, user.displayName);
 
     return Response.json({ record }, { status: 201 });
   } catch (error) {

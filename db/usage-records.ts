@@ -19,6 +19,7 @@ export type NewUsageRecordInput = {
 };
 
 const DEMO_ADDRESS = "1842 East Lemon Street";
+const DEMO_HOUSEHOLD_NAME = "GreenMeter demo home";
 
 const categoryLabels = {
   electricity: "Electricity",
@@ -66,10 +67,12 @@ export async function ensureUsageDatabase(database: D1Database) {
       CREATE TABLE IF NOT EXISTS households (
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         name TEXT NOT NULL,
-        address TEXT NOT NULL UNIQUE,
+        address TEXT NOT NULL,
+        owner_email TEXT UNIQUE,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
         CONSTRAINT households_name_not_blank CHECK(length(trim(name)) > 0),
-        CONSTRAINT households_address_not_blank CHECK(length(trim(address)) > 0)
+        CONSTRAINT households_address_not_blank CHECK(length(trim(address)) > 0),
+        CONSTRAINT households_owner_email_normalized CHECK(owner_email IS NULL OR owner_email = lower(trim(owner_email)))
       )
     `),
     database.prepare(`
@@ -101,7 +104,7 @@ export async function ensureUsageDatabase(database: D1Database) {
 
   await database
     .prepare("INSERT OR IGNORE INTO households (name, address) VALUES (?, ?)")
-    .bind("Demo home", DEMO_ADDRESS)
+    .bind(DEMO_HOUSEHOLD_NAME, DEMO_ADDRESS)
     .run();
 
   const household = await database
@@ -128,8 +131,37 @@ export async function ensureUsageDatabase(database: D1Database) {
   return household.id;
 }
 
-export async function listUsageRecords(database: D1Database): Promise<UsageRecordDto[]> {
-  const householdId = await ensureUsageDatabase(database);
+async function getOrCreateHousehold(database: D1Database, ownerEmail?: string, ownerName?: string) {
+  const demoHouseholdId = await ensureUsageDatabase(database);
+  if (!ownerEmail) return demoHouseholdId;
+
+  const normalizedEmail = ownerEmail.trim().toLowerCase();
+  const existing = await database
+    .prepare("SELECT id FROM households WHERE owner_email = ?")
+    .bind(normalizedEmail)
+    .first<{ id: number }>();
+  if (existing) return existing.id;
+
+  const household = await database.prepare(`
+    INSERT INTO households (name, address, owner_email)
+    VALUES (?, ?, ?)
+    RETURNING id
+  `).bind(
+    ownerName?.trim() ? `${ownerName.trim()}'s home` : "My home",
+    "Address not set",
+    normalizedEmail,
+  ).first<{ id: number }>();
+
+  if (!household) throw new Error("The household could not be created.");
+  return household.id;
+}
+
+export async function listUsageRecords(
+  database: D1Database,
+  ownerEmail?: string,
+  ownerName?: string,
+): Promise<UsageRecordDto[]> {
+  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
   const result = await database.prepare(`
     SELECT id, reading_date, utility_type, amount, unit, cost_cents, source
     FROM usage_records
@@ -141,8 +173,13 @@ export async function listUsageRecords(database: D1Database): Promise<UsageRecor
   return result.results.map(toDto);
 }
 
-export async function insertUsageRecord(database: D1Database, input: NewUsageRecordInput) {
-  const householdId = await ensureUsageDatabase(database);
+export async function insertUsageRecord(
+  database: D1Database,
+  input: NewUsageRecordInput,
+  ownerEmail: string,
+  ownerName?: string,
+) {
+  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
   const unit = units[input.category];
   const result = await database.prepare(`
     INSERT INTO usage_records

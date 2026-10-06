@@ -5,11 +5,13 @@ export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   address: text("address").notNull(),
+  ownerEmail: text("owner_email"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
-  uniqueIndex("households_address_unique").on(table.address),
+  uniqueIndex("households_owner_email_unique").on(table.ownerEmail),
   check("households_name_not_blank", sql`length(trim(${table.name})) > 0`),
   check("households_address_not_blank", sql`length(trim(${table.address})) > 0`),
+  check("households_owner_email_normalized", sql`${table.ownerEmail} is null or ${table.ownerEmail} = lower(trim(${table.ownerEmail}))`),
 ]);
 
 export const usageRecords = sqliteTable("usage_records", {

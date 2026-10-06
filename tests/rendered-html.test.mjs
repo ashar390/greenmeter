@@ -24,6 +24,8 @@ test("server-renders the GreenMeter dashboard with its intro", async () => {
   assert.match(html, /GreenMeter introduction/);
   assert.match(html, /Energy overview/);
   assert.match(html, /Recent usage records/);
+  assert.match(html, /Exploring the public demo/);
+  assert.match(html, /Sign in to add records/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 

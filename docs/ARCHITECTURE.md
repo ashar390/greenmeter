@@ -217,6 +217,7 @@ Greenmeter/
 │   ├── page.tsx          # Root composition: intro followed by dashboard
 │   ├── intro-sequence.tsx
 │   ├── dashboard/page.tsx
+│   ├── api/session/route.ts
 │   ├── api/usage-records/route.ts
 │   └── globals.css       # Visual system and responsive styles
 ├── db/
@@ -224,7 +225,8 @@ Greenmeter/
 │   └── usage-records.ts  # Prepared queries and row-to-API mapping
 ├── lib/
 │   ├── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
-│   └── emissions.ts       # EPA factors and emissions calculation
+│   ├── emissions.ts       # EPA factors and emissions calculation
+│   └── request-user.ts    # Trusted identity-header parsing
 ├── drizzle/
 │   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
 │   └── meta/             # Drizzle's migration history
@@ -242,12 +244,7 @@ The schema is deliberately separate from API code. `db/schema.ts` describes the 
 
 ## 10. Testing strategy
 
-The current tests build the production application and verify that important dashboard content is rendered.
-
-Later testing layers will include:
-
-1. **Unit tests** for calculations and validation rules.
-2. **API integration tests** for valid and invalid requests.
+The test suite builds the production application and verifies calculations, emissions factors, SQL constraints, database migrations, authenticated identity parsing, household record isolation, and important server-rendered content.
 3. **Database tests** for inserts, queries, and constraints.
 4. **Browser tests** for the complete add-record workflow.
 
@@ -264,13 +261,13 @@ We will build the project in this order:
 5. **Dashboard calculation service — complete.** Derive totals, costs, comparisons, goals, and chart values from saved records.
 6. **Error/loading states — complete.** Handle slow, empty, incomplete, or failed requests honestly.
 7. **Emissions service — complete.** Estimate electricity and gas emissions with documented EPA factors and explicit exclusions.
-8. **Authentication.** Associate private records with a user only after core data flows work.
+8. **Authentication and authorization — complete.** Keep the demo public and read-only while scoping authenticated API operations to the signed-in household.
 9. **Deployment and observability.** Publish, log errors, and measure health.
 
-This order minimizes hidden complexity. Authentication and cloud deployment matter, but neither should be introduced before the basic data flow is understood.
+This order minimizes hidden complexity. Authentication was added after the data flow so its authorization boundaries could be tested independently.
 
 ## 12. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented a REST-style API that persists usage records in Cloudflare D1, and created unit-tested services for period analytics and EPA-based carbon estimates.
+You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, and created unit-tested services for period analytics and EPA-based carbon estimates.
 
-Do **not** yet claim Spring Boot, authentication, real utility integrations, water emissions, or utility-certified carbon accounting. The current provider rows are demonstration data, and new records are manually entered.
+Do **not** yet claim Spring Boot, real utility integrations, water emissions, or utility-certified carbon accounting. Public provider rows are demonstration data, and authenticated records are manually entered.

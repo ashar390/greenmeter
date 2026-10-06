@@ -39,6 +39,27 @@ test("migration creates the expected GreenMeter tables", async () => {
     .map((row) => row.name);
 
   assert.deepEqual(tables, ["households", "reduction_goals", "usage_records"]);
+  const columns = database.prepare("PRAGMA table_info(households)").all().map((column) => column.name);
+  assert.deepEqual(columns, ["id", "name", "address", "owner_email", "created_at"]);
+  database.close();
+});
+
+test("household owners are unique while addresses may be shared", async () => {
+  const database = await createDatabase();
+  const insert = database.prepare("INSERT INTO households (name, address, owner_email) VALUES (?, ?, ?)");
+
+  insert.run("First home", "100 Main Street", "first@example.com");
+  insert.run("Second home", "100 Main Street", "second@example.com");
+
+  assert.throws(
+    () => insert.run("Duplicate owner", "200 Main Street", "first@example.com"),
+    /UNIQUE constraint failed/,
+  );
+  assert.throws(
+    () => insert.run("Mixed case", "300 Main Street", "Third@Example.com"),
+    /households_owner_email_normalized/,
+  );
+
   database.close();
 });
 

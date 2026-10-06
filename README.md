@@ -17,11 +17,12 @@ Implemented:
 - Versioned D1/SQLite schema for households, usage records, and reduction goals
 - REST-style read and write API
 - EPA-based electricity and natural-gas emissions estimates
+- Public read-only demonstration mode
+- Authenticated household workspaces with server-side record isolation
 - Unit, schema, and production-render tests
 
 Not implemented yet:
 
-- Authentication
 - Real utility-company integrations
 - Water emissions calculations
 - Public production deployment
@@ -48,8 +49,8 @@ This creates a production build and executes the automated checks.
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a beginner-friendly explanation of:
 
 - every language and framework;
-- how React state currently stores data;
-- why the next milestone uses SQL, Cloudflare D1, and Drizzle;
+- how React communicates with the API and persistent database;
+- why the project uses SQL, Cloudflare D1, and Drizzle;
 - how browser, API, and database layers will communicate; and
 - what is honest to claim on a résumé at each stage.
 
@@ -63,4 +64,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Add authentication and household-level data isolation, then publish the production deployment.
+Add a production-ready data-import workflow, then publish the production deployment.

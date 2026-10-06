@@ -40,10 +40,17 @@ a { color: inherit; }
 .account-area { margin-left: auto; display: flex; align-items: center; gap: 7px; }
 .help-button { border: 0; background: transparent; color: var(--muted); font-size: 13px; }
 .account-button { display: flex; align-items: center; gap: 8px; border: 1px solid transparent; background: transparent; color: var(--ink); padding: 5px 7px; border-radius: 7px; font-size: 13px; }
+.account-button { text-decoration: none; }
 .account-button:hover { background: #f3f4ef; border-color: var(--line); }
 .account-button > span:first-child { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #e7ece7; color: #425149; font-weight: 700; font-size: 10px; }
+.header-sign-in { padding: 7px 12px; border: 1px solid var(--green); border-radius: 5px; color: var(--green); font-size: 12px; font-weight: 650; text-decoration: none; }
 
 .page { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 38px 0 56px; }
+.demo-notice { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 22px; padding: 13px 16px; border: 1px solid #d8cda8; border-radius: 8px; background: #f5f0df; }
+.demo-notice div { display: grid; gap: 2px; }
+.demo-notice strong { font-size: 12px; }
+.demo-notice span { color: var(--muted); font-size: 11px; }
+.demo-notice a { flex: none; color: var(--green-dark); font-size: 11px; font-weight: 700; text-underline-offset: 3px; }
 .page-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; margin-bottom: 30px; }
 .breadcrumbs { margin-bottom: 16px; color: #7c8882; font-size: 12px; }
 .breadcrumbs span { margin: 0 7px; color: #a7afab; }
@@ -133,6 +140,7 @@ select:focus, input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .recommendation-type { width: fit-content; padding: 4px 7px; border-radius: 4px; background: var(--green-light); color: var(--green); font-size: 9px; font-weight: 700; text-transform: uppercase; }
 .recommendation-type.alert { background: var(--red-light); color: var(--red); }
 .secondary-button, .primary-button { border-radius: 5px; padding: 8px 12px; font-size: 11px; font-weight: 650; }
+.secondary-button, .primary-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .secondary-button { border: 1px solid var(--line-strong); background: #fff; color: #45524c; }
 .secondary-button:hover { background: var(--subtle); }
 .primary-button { border: 1px solid var(--green); background: var(--green); color: #fff; }
@@ -194,6 +202,7 @@ footer span:first-child { color: var(--green-dark); font-weight: 700; }
   .account-name, .help-button { display: none; }
   .page { padding-top: 24px; }
   .page-heading { display: grid; align-items: start; }
+  .demo-notice { align-items: flex-start; }
   .page-controls { width: 100%; }
   .billing-strip { grid-template-columns: 1fr; gap: 14px; }
   .impact-note { grid-template-columns: auto 1fr; }

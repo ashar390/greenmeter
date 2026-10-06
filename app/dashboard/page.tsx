@@ -17,6 +17,14 @@ type UsageRecord = {
   source: "Manual" | "Demo data" | "Utility sync";
 };
 
+type Session = {
+  authenticated: boolean;
+  mode: "demo" | "personal";
+  user: { email: string; displayName: string } | null;
+};
+
+const signInPath = "/signin-with-chatgpt?return_to=%2Fdashboard";
+
 function comparisonLabel(change: number | null) {
   if (change === null) return { className: "", text: "No previous data" };
   if (Math.abs(change) < 0.05) return { className: "", text: "No change" };
@@ -33,6 +41,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState("");
   const [period, setPeriod] = useState<ReportingPeriod>("current");
+  const [session, setSession] = useState<Session>({ authenticated: false, mode: "demo", user: null });
 
   const summary = useMemo(() => calculateDashboardSummary(records, period), [records, period]);
   const electricityComparison = comparisonLabel(summary.electricity.changePercent);
@@ -48,10 +57,16 @@ export default function Home() {
 
     async function loadRecords() {
       try {
-        const response = await fetch("/api/usage-records", { signal: controller.signal });
-        const data = await response.json() as { records?: UsageRecord[]; error?: string };
-        if (!response.ok || !data.records) throw new Error(data.error ?? "Usage records could not be loaded.");
+        const [recordsResponse, sessionResponse] = await Promise.all([
+          fetch("/api/usage-records", { signal: controller.signal }),
+          fetch("/api/session", { signal: controller.signal }),
+        ]);
+        const data = await recordsResponse.json() as { records?: UsageRecord[]; error?: string };
+        const sessionData = await sessionResponse.json() as Session;
+        if (!recordsResponse.ok || !data.records) throw new Error(data.error ?? "Usage records could not be loaded.");
+        if (!sessionResponse.ok) throw new Error("Account status could not be loaded.");
         setRecords(data.records);
+        setSession(sessionData);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setNotice(error instanceof Error ? error.message : "Usage records could not be loaded.");
@@ -66,6 +81,10 @@ export default function Home() {
 
   async function addRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!session.authenticated) {
+      window.location.assign(signInPath);
+      return;
+    }
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const category = form.get("category") as Utility;
@@ -121,17 +140,25 @@ export default function Home() {
           </nav>
           <div className="account-area">
             <button className="help-button">Help</button>
-            <button className="account-button" aria-label="Open account menu">
-              <span>AS</span><span className="account-name">Anusha</span><span aria-hidden="true">⌄</span>
-            </button>
+            {session.authenticated ? (
+              <a className="account-button" href="/signout-with-chatgpt?return_to=%2F" aria-label="Sign out">
+                <span>{session.user?.displayName.slice(0, 2).toUpperCase()}</span><span className="account-name">{session.user?.displayName}</span><span>Sign out</span>
+              </a>
+            ) : <a className="header-sign-in" href={signInPath}>Sign in</a>}
           </div>
         </div>
       </header>
 
       <main className="page" id="overview">
+        {session.mode === "demo" && (
+          <section className="demo-notice" aria-label="Demonstration mode">
+            <div><strong>Exploring the public demo</strong><span>This household is read-only. Sign in to create a private workspace and save your own readings.</span></div>
+            <a href={signInPath}>Sign in to start</a>
+          </section>
+        )}
         <section className="page-heading">
           <div>
-            <div className="breadcrumbs">Home <span>/</span> 1842 East Lemon Street</div>
+            <div className="breadcrumbs">Home <span>/</span> {session.mode === "demo" ? "Demonstration household" : "My household"}</div>
             <h1>Energy overview</h1>
             <p>Usage, cost, and emissions estimates for this billing cycle.</p>
           </div>
@@ -239,7 +266,9 @@ export default function Home() {
             <div className="recommendation-row">
               <span className="recommendation-type">Tip</span>
               <div><strong>Consistent readings improve comparisons</strong><p>Record each utility on the same schedule so monthly totals represent similar time spans.</p></div>
-              <button className="secondary-button" onClick={() => setShowForm(true)}>Add reading</button>
+              {session.authenticated
+                ? <button className="secondary-button" onClick={() => setShowForm(true)}>Add reading</button>
+                : <a className="secondary-button" href={signInPath}>Sign in to add</a>}
             </div>
           </div>
         </section>
@@ -247,7 +276,9 @@ export default function Home() {
         <section className="card records-card" id="records">
           <div className="card-header">
             <div><h2>Recent usage records</h2><p>Demonstration and manually entered utility readings</p></div>
-            <button className="primary-button" onClick={() => setShowForm((current) => !current)}>{showForm ? "Cancel" : "Add record"}</button>
+            {session.authenticated
+              ? <button className="primary-button" onClick={() => setShowForm((current) => !current)}>{showForm ? "Cancel" : "Add record"}</button>
+              : <a className="primary-button" href={signInPath}>Sign in to add records</a>}
           </div>
           {showForm && (
             <form className="record-form" onSubmit={addRecord}>
