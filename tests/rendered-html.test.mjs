@@ -32,7 +32,8 @@ test("keeps the direct dashboard route available", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Energy overview/);
-  assert.match(html, /Emissions estimate not configured/);
+  assert.match(html, /Estimated household emissions/);
+  assert.match(html, /How this estimate works/);
   assert.match(html, /Latest recorded month/);
   assert.match(html, /Electricity usage/);
   assert.match(html, /Recent usage records/);

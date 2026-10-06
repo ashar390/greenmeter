@@ -1,3 +1,5 @@
+import { estimateEmissions, type EmissionsEstimate } from "./emissions.ts";
+
 export type ReportingPeriod = "current" | "previous" | "last12";
 
 export type DashboardUsageRecord = {
@@ -32,6 +34,7 @@ export type DashboardSummary = {
   electricity: UtilityTotal;
   water: UtilityTotal;
   gas: UtilityTotal;
+  emissions: EmissionsEstimate & { changePercent: number | null };
   electricityDays: ElectricityDay[];
   electricityAverage: number | null;
   electricityHighest: number | null;
@@ -72,7 +75,7 @@ function totalFor(records: DashboardUsageRecord[], category: DashboardUsageRecor
 
 function changePercent(current: number, previous: number) {
   if (previous <= 0) return null;
-  return ((current - previous) / previous) * 100;
+  return round(((current - previous) / previous) * 100);
 }
 
 function round(value: number, places = 1) {
@@ -116,6 +119,11 @@ export function calculateDashboardSummary(
   const electricity = totalFor(currentRecords, "Electricity");
   const water = totalFor(currentRecords, "Water");
   const gas = totalFor(currentRecords, "Gas");
+  const emissions = estimateEmissions(electricity, gas);
+  const comparisonEmissions = estimateEmissions(
+    totalFor(comparisonRecords, "Electricity"),
+    totalFor(comparisonRecords, "Gas"),
+  );
   const electricityDays = currentRecords
     .filter((record) => record.category === "Electricity")
     .sort((left, right) => left.date.localeCompare(right.date))
@@ -151,6 +159,10 @@ export function calculateDashboardSummary(
       amount: round(gas),
       unit: utilityUnits.Gas,
       changePercent: changePercent(gas, totalFor(comparisonRecords, "Gas")),
+    },
+    emissions: {
+      ...emissions,
+      changePercent: changePercent(emissions.totalKg, comparisonEmissions.totalKg),
     },
     electricityDays,
     electricityAverage: electricityDays.length ? round(electricity / electricityDays.length) : null,

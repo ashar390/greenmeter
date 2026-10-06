@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { calculateDashboardSummary, type ReportingPeriod } from "../../lib/dashboard-summary";
+import { emissionsFactors } from "../../lib/emissions";
 
 type Utility = "Electricity" | "Gas" | "Water";
 
@@ -37,6 +38,7 @@ export default function Home() {
   const electricityComparison = comparisonLabel(summary.electricity.changePercent);
   const waterComparison = comparisonLabel(summary.water.changePercent);
   const gasComparison = comparisonLabel(summary.gas.changePercent);
+  const emissionsComparison = comparisonLabel(summary.emissions.changePercent);
   const achievedReduction = summary.electricity.changePercent === null
     ? null
     : Math.max(0, -summary.electricity.changePercent);
@@ -153,9 +155,9 @@ export default function Home() {
         </section>
 
         <section className="impact-note" aria-label="Current sustainability insight">
-          <div className="impact-number">—</div>
-          <div><strong>Emissions estimate not configured</strong><p>Usage totals are live. A documented emissions-factor service is the next calculation layer.</p></div>
-          <a href="#records">View source data <span aria-hidden="true">→</span></a>
+          <div className="impact-number">{summary.emissions.totalKg.toLocaleString()}<span>kg</span></div>
+          <div><strong>Estimated household emissions</strong><p>Calculated from recorded electricity and natural-gas usage for this period.</p></div>
+          <a href="#emissions-method">See methodology <span aria-hidden="true">→</span></a>
         </section>
 
         <section className="summary-grid" aria-label="Utility summary">
@@ -176,8 +178,8 @@ export default function Home() {
           </article>
           <article className="summary-card">
             <div className="summary-label">Estimated emissions</div>
-            <div className="summary-value">— <small>kg CO₂e</small></div>
-            <div className="summary-meta"><span>Calculation not configured</span></div>
+            <div className="summary-value">{summary.emissions.totalKg.toLocaleString()} <small>kg CO₂e</small></div>
+            <div className="summary-meta"><span className={emissionsComparison.className}>{emissionsComparison.text}</span><span>{summary.emissions.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
         </section>
 
@@ -214,10 +216,14 @@ export default function Home() {
               <div className="progress-track"><span style={{ width: `${achievedReduction === null ? 0 : Math.min(100, achievedReduction * 10)}%` }} /></div>
               <div className="target-scale"><span>0%</span><span>Target: 10%</span></div>
             </article>
-            <article className="card emissions-card">
-              <h2>Why emissions are unavailable</h2>
-              <p>GreenMeter needs documented electricity, gas, and water factors before it can calculate a defensible estimate.</p>
-              <button className="link-button">Calculation layer coming next</button>
+            <article className="card emissions-card" id="emissions-method">
+              <h2>How this estimate works</h2>
+              <p><strong>{summary.emissions.electricityKg} kg</strong> from electricity plus <strong>{summary.emissions.gasKg} kg</strong> from natural-gas combustion. Water is excluded because no water emissions factor is configured.</p>
+              <div className="factor-list">
+                <a href={emissionsFactors.electricity.sourceUrl} target="_blank" rel="noreferrer"><span>Electricity</span><strong>{emissionsFactors.electricity.value.toFixed(3)} kg/kWh</strong><small>{emissionsFactors.electricity.region} · {emissionsFactors.electricity.dataYear}</small></a>
+                <a href={emissionsFactors.naturalGas.sourceUrl} target="_blank" rel="noreferrer"><span>Natural gas</span><strong>{emissionsFactors.naturalGas.value.toFixed(3)} kg/therm</strong><small>{emissionsFactors.naturalGas.sourceName}</small></a>
+              </div>
+              <p className="method-note">Estimates use EPA defaults and are not utility-certified measurements.</p>
             </article>
           </aside>
         </section>

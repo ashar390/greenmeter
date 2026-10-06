@@ -22,6 +22,8 @@ test("calculates totals, chart values, cost, and previous-period changes", () =>
   assert.equal(summary.electricityHighest, 20);
   assert.equal(summary.chartMaximum, 20);
   assert.equal(summary.daysRecorded, 2);
+  assert.equal(summary.emissions.totalKg, 9.6);
+  assert.equal(summary.emissions.changePercent, -25);
   assert.deepEqual(summary.electricityDays.map((day) => day.amount), [10, 20]);
 });
 

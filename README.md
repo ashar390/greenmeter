@@ -1,29 +1,30 @@
 # GreenMeter
 
-GreenMeter is a household utility dashboard for reviewing electricity, water, and natural-gas usage. It presents billing-cycle totals, comparisons, estimated emissions, usage alerts, and individual records in a practical account-portal interface.
+GreenMeter is a full-stack household utility dashboard for reviewing electricity, water, and natural-gas usage. It persists utility records, calculates period-over-period trends, and estimates emissions with documented U.S. Environmental Protection Agency factors.
 
 ## Current milestone
 
-The current release includes a frontend prototype plus the first versioned SQL schema. Records added through the form still use React state and last only until the page is refreshed; connecting the UI to the database is the next API milestone.
+The current release connects a responsive React dashboard to a Cloudflare D1 database through validated API routes. Dashboard metrics and emissions estimates are derived from persisted records rather than hard-coded display values.
 
 Implemented:
 
 - Responsive utility-account dashboard
-- Billing-cycle and comparison context
-- Daily electricity visualization
-- Validated usage-entry form
-- Derived projected-cost calculation
+- Reporting-period totals and comparisons
+- Data-driven electricity visualization
+- Validated, persistent usage-entry form
+- Recorded-cost calculation
 - Recent-records table
-- Automated production-render checks
 - Versioned D1/SQLite schema for households, usage records, and reduction goals
-- Database constraints, indexes, foreign keys, and schema tests
+- REST-style read and write API
+- EPA-based electricity and natural-gas emissions estimates
+- Unit, schema, and production-render tests
 
 Not implemented yet:
 
-- REST API endpoints
 - Authentication
 - Real utility-company integrations
-- Production-grade emissions calculations
+- Water emissions calculations
+- Public production deployment
 
 ## Start locally
 
@@ -52,6 +53,14 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a beginner-friendly explan
 - how browser, API, and database layers will communicate; and
 - what is honest to claim on a résumé at each stage.
 
+## Emissions methodology
+
+- Electricity uses the EPA eGRID2023 AZNM total output rate for the WECC Southwest region.
+- Natural gas uses the EPA 2025 stationary-combustion factors, converted to kilograms of CO2e per therm.
+- Water is intentionally excluded until a defensible regional factor is selected.
+
+These results are estimates based on recorded activity and are not utility-certified measurements.
+
 ## Next milestone
 
-Build the usage-record API and replace temporary browser data with persisted D1 records.
+Add authentication and household-level data isolation, then publish the production deployment.

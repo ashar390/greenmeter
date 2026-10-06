@@ -223,7 +223,8 @@ Greenmeter/
 │   ├── schema.ts         # Typed definitions for the three SQL tables
 │   └── usage-records.ts  # Prepared queries and row-to-API mapping
 ├── lib/
-│   └── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
+│   ├── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
+│   └── emissions.ts       # EPA factors and emissions calculation
 ├── drizzle/
 │   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
 │   └── meta/             # Drizzle's migration history
@@ -262,13 +263,14 @@ We will build the project in this order:
 4. **Write API — complete.** Validate and save manually entered records.
 5. **Dashboard calculation service — complete.** Derive totals, costs, comparisons, goals, and chart values from saved records.
 6. **Error/loading states — complete.** Handle slow, empty, incomplete, or failed requests honestly.
-7. **Authentication.** Associate private records with a user only after core data flows work.
-8. **Deployment and observability.** Publish, log errors, and measure health.
+7. **Emissions service — complete.** Estimate electricity and gas emissions with documented EPA factors and explicit exclusions.
+8. **Authentication.** Associate private records with a user only after core data flows work.
+9. **Deployment and observability.** Publish, log errors, and measure health.
 
 This order minimizes hidden complexity. Authentication and cloud deployment matter, but neither should be introduced before the basic data flow is understood.
 
 ## 12. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented a REST-style API that persists usage records in Cloudflare D1, and created a unit-tested calculation service for totals, period comparisons, targets, and chart data.
+You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented a REST-style API that persists usage records in Cloudflare D1, and created unit-tested services for period analytics and EPA-based carbon estimates.
 
-Do **not** yet claim Spring Boot, authentication, real utility integrations, or production carbon calculations. The current provider rows are demonstration data, and new records are manually entered.
+Do **not** yet claim Spring Boot, authentication, real utility integrations, water emissions, or utility-certified carbon accounting. The current provider rows are demonstration data, and new records are manually entered.
