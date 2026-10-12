@@ -1,5 +1,6 @@
 import { insertUsageRecord, listUsageRecords, type UtilityType } from "../../../db/usage-records";
-import { getRequestUser } from "../../../lib/request-user";
+import { auth } from "../../../auth";
+import { getSessionUser } from "../../../lib/session-user";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,10 @@ function isIsoDate(value: unknown): value is string {
   return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const user = getRequestUser(request);
-    const records = await listUsageRecords(await getDatabase(), user?.email, user?.displayName);
+    const user = getSessionUser(await auth());
+    const records = await listUsageRecords(await getDatabase(), user?.id, user?.displayName);
     return Response.json({ records, mode: user ? "personal" : "demo" });
   } catch (error) {
     console.error("Unable to load usage records", error);
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = getRequestUser(request);
+    const user = getSessionUser(await auth());
     if (!user) {
       return Response.json(
         { error: "Sign in to add records to a private household." },
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       category: category as UtilityType,
       amount,
       costCents: Math.round(cost * 100),
-    }, user.email, user.displayName);
+    }, user.id, user.displayName);
 
     return Response.json({ record }, { status: 201 });
   } catch (error) {

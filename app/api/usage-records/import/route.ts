@@ -1,6 +1,7 @@
 import { insertUsageRecords } from "../../../../db/usage-records";
 import { parseUsageCsv } from "../../../../lib/csv-import";
-import { getRequestUser } from "../../../../lib/request-user";
+import { auth } from "../../../../auth";
+import { getSessionUser } from "../../../../lib/session-user";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ async function getDatabase() {
 }
 
 export async function POST(request: Request) {
-  const user = getRequestUser(request);
+  const user = getSessionUser(await auth());
   if (!user) return Response.json({ error: "Sign in to import records." }, { status: 401 });
 
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       return Response.json({ ...preview, error: "Fix every validation error before importing." }, { status: 422 });
     }
 
-    const records = await insertUsageRecords(await getDatabase(), preview.rows, user.email, user.displayName);
+    const records = await insertUsageRecords(await getDatabase(), preview.rows, user.id, user.displayName);
     return Response.json({ imported: preview.rows.length, records }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

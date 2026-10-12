@@ -40,6 +40,15 @@ test("keeps the direct dashboard route available", async () => {
   assert.match(html, /Recent usage records/);
 });
 
+test("renders the account sign-in page", async () => {
+  const response = await render("/sign-in");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Sign in to save your utility history/);
+  assert.match(html, /Continue with GitHub/);
+  assert.match(html, /does not receive your GitHub password/);
+});
+
 test("includes production project configuration and assets", async () => {
   const [layout, page, intro, dashboard, packageJson, workerConfig] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),

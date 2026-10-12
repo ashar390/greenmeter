@@ -58,11 +58,14 @@ test("authenticated households cannot read each other's usage records", async ()
   const { sqlite, database } = await createD1Adapter();
   const input = { date: "2026-10-06", category: "electricity", amount: 12.5, costCents: 180 };
 
-  await insertUsageRecord(database, input, "first@example.com", "First User");
-  await insertUsageRecord(database, { ...input, amount: 27.2 }, "second@example.com", "Second User");
+  sqlite.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-1", "First User", "first@example.com");
+  sqlite.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-2", "Second User", "second@example.com");
 
-  const firstRecords = await listUsageRecords(database, "first@example.com", "First User");
-  const secondRecords = await listUsageRecords(database, "second@example.com", "Second User");
+  await insertUsageRecord(database, input, "user-1", "First User");
+  await insertUsageRecord(database, { ...input, amount: 27.2 }, "user-2", "Second User");
+
+  const firstRecords = await listUsageRecords(database, "user-1", "First User");
+  const secondRecords = await listUsageRecords(database, "user-2", "Second User");
   const demoRecords = await listUsageRecords(database);
 
   assert.deepEqual(firstRecords.map((record) => record.amount), [12.5]);
@@ -75,14 +78,17 @@ test("authenticated households cannot read each other's usage records", async ()
 test("bulk imports are attributed to the authenticated household and CSV source", async () => {
   const { sqlite, database } = await createD1Adapter();
 
+  sqlite.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-import", "Import User", "importer@example.com");
+  sqlite.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-other", "Another User", "another@example.com");
+
   const records = await insertUsageRecords(database, [
     { date: "2026-10-01", category: "electricity", amount: 15, costCents: 210 },
     { date: "2026-10-02", category: "water", amount: 120, costCents: 70 },
-  ], "importer@example.com", "Import User");
+  ], "user-import", "Import User");
 
   assert.equal(records.length, 2);
   assert.deepEqual(records.map((record) => record.source), ["CSV import", "CSV import"]);
-  assert.equal((await listUsageRecords(database, "another@example.com", "Another User")).length, 0);
+  assert.equal((await listUsageRecords(database, "user-other", "Another User")).length, 0);
 
   sqlite.close();
 });

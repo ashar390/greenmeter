@@ -19,7 +19,7 @@ Browser interface  →  Application/API  →  SQL database
 What users see         Rules and validation   Permanent records
 ```
 
-The interface and database schema are complete today. The API connection between them is the next milestone. Building the project in layers keeps each learning step small enough to understand and test.
+The interface, API, database, and account authentication are connected today. Building the project in layers keeps each learning step small enough to understand and test.
 
 ## 2. Current architecture
 
@@ -32,9 +32,7 @@ User's browser
     └── React state stores records temporarily while the page is open
 ```
 
-The current version is a **frontend prototype**. If the page is refreshed, manually entered records disappear because they are stored only in browser memory.
-
-That limitation is deliberate for the first milestone. It lets us verify the product flow before introducing database and server complexity.
+The current version is a full-stack application. Public visitors receive a read-only demonstration household, while signed-in users receive a private household backed by persistent database records.
 
 ## 3. Languages
 
@@ -157,7 +155,10 @@ Drizzle maps TypeScript code to SQL tables. It gives us type checking while stil
 
 ```text
 households
-  id, name, address, created_at
+  id, name, address, owner_user_id, created_at
+
+users, accounts, sessions, verification_tokens
+  account identity and database-backed sessions
 
 usage_records
   id, household_id, utility_type, reading_date,
@@ -170,7 +171,26 @@ reduction_goals
 
 Money will be stored as integer cents rather than decimal dollars. Integer storage avoids floating-point rounding errors such as `0.1 + 0.2` not being represented exactly by a computer.
 
-## 7. Request flow
+## 7. Authentication and authorization
+
+GreenMeter uses **Auth.js** with GitHub OAuth. OAuth means GitHub verifies the
+user; GreenMeter never receives or stores the user's GitHub password. Auth.js
+creates a secure session cookie and stores the associated account and session
+records in D1.
+
+Authentication answers “who is making this request?” Authorization answers
+“what may that user access?” GreenMeter performs both checks on the server:
+
+1. Auth.js validates the session cookie.
+2. The API reads the authenticated user's stable account ID.
+3. Database queries locate the household owned by that account ID.
+4. Reads and writes are restricted to that household.
+
+The public demonstration has no account ID and remains read-only. A stable user
+ID is used instead of an email address because a user can change their email
+without changing ownership of their data.
+
+## 8. Request flow
 
 Loading the dashboard works like this:
 
@@ -193,7 +213,7 @@ Form → client validation → POST /api/usage-records → server validation
 
 Client validation gives the user fast feedback. Server validation is still required because a caller can bypass the browser and send requests directly to the API.
 
-## 8. UI architecture
+## 9. UI architecture
 
 The redesigned interface follows conventions used by real account and utility portals:
 
@@ -208,7 +228,7 @@ The redesigned interface follows conventions used by real account and utility po
 
 The result is intentionally quieter and more information-dense. A real product needs to help users verify numbers and complete tasks, not merely look impressive in a screenshot.
 
-## 9. Folder map
+## 10. Folder map
 
 ```text
 Greenmeter/
@@ -217,6 +237,8 @@ Greenmeter/
 │   ├── page.tsx          # Root composition: intro followed by dashboard
 │   ├── intro-sequence.tsx
 │   ├── dashboard/page.tsx
+│   ├── sign-in/page.tsx
+│   ├── api/auth/[...nextauth]/route.ts
 │   ├── api/session/route.ts
 │   ├── api/usage-records/route.ts
 │   └── globals.css       # Visual system and responsive styles
@@ -226,7 +248,7 @@ Greenmeter/
 ├── lib/
 │   ├── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
 │   ├── emissions.ts       # EPA factors and emissions calculation
-│   └── request-user.ts    # Trusted identity-header parsing
+│   └── session-user.ts    # Validated application-session identity
 ├── drizzle/
 │   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
 │   └── meta/             # Drizzle's migration history
@@ -237,12 +259,14 @@ Greenmeter/
 ├── tests/
 │   └── rendered-html.test.mjs
 ├── package.json          # Dependencies and development commands
+├── auth.ts               # OAuth and D1 session configuration
+├── wrangler.jsonc        # Worker, asset, and D1 deployment bindings
 └── vite.config.ts        # Build and Cloudflare configuration
 ```
 
 The schema is deliberately separate from API code. `db/schema.ts` describes the intended database, while `drizzle/` records the exact SQL needed to create it. This makes schema changes reviewable and repeatable across local, test, and hosted databases.
 
-## 10. Testing strategy
+## 11. Testing strategy
 
 The test suite builds the production application and verifies calculations, emissions factors, SQL constraints, database migrations, authenticated identity parsing, household record isolation, and important server-rendered content.
 3. **Database tests** for inserts, queries, and constraints.
@@ -250,7 +274,7 @@ The test suite builds the production application and verifies calculations, emis
 
 Each layer catches a different category of failure. More tests are not automatically better; tests should protect behavior that matters.
 
-## 11. Build sequence
+## 12. Build sequence
 
 We will build the project in this order:
 
@@ -267,7 +291,7 @@ We will build the project in this order:
 
 This order minimizes hidden complexity. Authentication was added after the data flow so its authorization boundaries could be tested independently.
 
-## 12. What you may claim today
+## 13. What you may claim today
 
 You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, added a validated bulk CSV ingestion workflow, and created unit-tested services for period analytics and EPA-based carbon estimates.
 

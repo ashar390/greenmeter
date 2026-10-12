@@ -1,17 +1,57 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").unique(),
+  emailVerified: text("emailVerified"),
+  image: text("image"),
+});
+
+export const accounts = sqliteTable("accounts", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  provider: text("provider").notNull(),
+  providerAccountId: text("providerAccountId").notNull(),
+  refreshToken: text("refresh_token"),
+  accessToken: text("access_token"),
+  expiresAt: integer("expires_at"),
+  tokenType: text("token_type"),
+  scope: text("scope"),
+  idToken: text("id_token"),
+  sessionState: text("session_state"),
+  oauthTokenSecret: text("oauth_token_secret"),
+  oauthToken: text("oauth_token"),
+}, (table) => [
+  uniqueIndex("accounts_provider_account_unique").on(table.provider, table.providerAccountId),
+  index("accounts_user_id_idx").on(table.userId),
+]);
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").notNull(),
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expires: text("expires").notNull(),
+}, (table) => [index("sessions_user_id_idx").on(table.userId)]);
+
+export const verificationTokens = sqliteTable("verification_tokens", {
+  identifier: text("identifier").notNull(),
+  token: text("token").primaryKey(),
+  expires: text("expires").notNull(),
+});
+
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   address: text("address").notNull(),
-  ownerEmail: text("owner_email"),
+  ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
-  uniqueIndex("households_owner_email_unique").on(table.ownerEmail),
+  uniqueIndex("households_owner_user_id_unique").on(table.ownerUserId),
   check("households_name_not_blank", sql`length(trim(${table.name})) > 0`),
   check("households_address_not_blank", sql`length(trim(${table.address})) > 0`),
-  check("households_owner_email_normalized", sql`${table.ownerEmail} is null or ${table.ownerEmail} = lower(trim(${table.ownerEmail}))`),
 ]);
 
 export const usageRecords = sqliteTable("usage_records", {

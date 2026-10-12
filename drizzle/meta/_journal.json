@@ -29,6 +29,13 @@
       "when": 1791282996464,
       "tag": "0003_add_csv_import_source",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791782642971,
+      "tag": "0004_add-account-sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -38,26 +38,28 @@ test("migration creates the expected GreenMeter tables", async () => {
     .all()
     .map((row) => row.name);
 
-  assert.deepEqual(tables, ["households", "reduction_goals", "usage_records"]);
+  assert.deepEqual(tables, ["accounts", "households", "reduction_goals", "sessions", "usage_records", "users", "verification_tokens"]);
   const columns = database.prepare("PRAGMA table_info(households)").all().map((column) => column.name);
-  assert.deepEqual(columns, ["id", "name", "address", "owner_email", "created_at"]);
+  assert.deepEqual(columns, ["id", "name", "address", "owner_user_id", "created_at"]);
   database.close();
 });
 
-test("household owners are unique while addresses may be shared", async () => {
+test("households use unique account IDs while addresses may be shared", async () => {
   const database = await createDatabase();
-  const insert = database.prepare("INSERT INTO households (name, address, owner_email) VALUES (?, ?, ?)");
+  database.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-1", "First User", "first@example.com");
+  database.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("user-2", "Second User", "second@example.com");
+  const insert = database.prepare("INSERT INTO households (name, address, owner_user_id) VALUES (?, ?, ?)");
 
-  insert.run("First home", "100 Main Street", "first@example.com");
-  insert.run("Second home", "100 Main Street", "second@example.com");
+  insert.run("First home", "100 Main Street", "user-1");
+  insert.run("Second home", "100 Main Street", "user-2");
 
   assert.throws(
-    () => insert.run("Duplicate owner", "200 Main Street", "first@example.com"),
+    () => insert.run("Duplicate owner", "200 Main Street", "user-1"),
     /UNIQUE constraint failed/,
   );
   assert.throws(
-    () => insert.run("Mixed case", "300 Main Street", "Third@Example.com"),
-    /households_owner_email_normalized/,
+    () => insert.run("Missing account", "300 Main Street", "user-3"),
+    /FOREIGN KEY constraint failed/,
   );
 
   database.close();

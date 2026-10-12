@@ -1,0 +1,3 @@
+AUTH_SECRET=replace-with-a-long-random-value
+AUTH_GITHUB_ID=replace-with-your-github-oauth-client-id
+AUTH_GITHUB_SECRET=replace-with-your-github-oauth-client-secret

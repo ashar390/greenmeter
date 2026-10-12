@@ -69,11 +69,11 @@ export async function ensureUsageDatabase(database: D1Database) {
         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         name TEXT NOT NULL,
         address TEXT NOT NULL,
-        owner_email TEXT UNIQUE,
+        owner_user_id TEXT UNIQUE,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
         CONSTRAINT households_name_not_blank CHECK(length(trim(name)) > 0),
-        CONSTRAINT households_address_not_blank CHECK(length(trim(address)) > 0),
-        CONSTRAINT households_owner_email_normalized CHECK(owner_email IS NULL OR owner_email = lower(trim(owner_email)))
+        CONSTRAINT households_address_not_blank CHECK(length(trim(address)) > 0)
       )
     `),
     database.prepare(`
@@ -132,25 +132,24 @@ export async function ensureUsageDatabase(database: D1Database) {
   return household.id;
 }
 
-async function getOrCreateHousehold(database: D1Database, ownerEmail?: string, ownerName?: string) {
+async function getOrCreateHousehold(database: D1Database, ownerUserId?: string, ownerName?: string) {
   const demoHouseholdId = await ensureUsageDatabase(database);
-  if (!ownerEmail) return demoHouseholdId;
+  if (!ownerUserId) return demoHouseholdId;
 
-  const normalizedEmail = ownerEmail.trim().toLowerCase();
   const existing = await database
-    .prepare("SELECT id FROM households WHERE owner_email = ?")
-    .bind(normalizedEmail)
+    .prepare("SELECT id FROM households WHERE owner_user_id = ?")
+    .bind(ownerUserId)
     .first<{ id: number }>();
   if (existing) return existing.id;
 
   const household = await database.prepare(`
-    INSERT INTO households (name, address, owner_email)
+    INSERT INTO households (name, address, owner_user_id)
     VALUES (?, ?, ?)
     RETURNING id
   `).bind(
     ownerName?.trim() ? `${ownerName.trim()}'s home` : "My home",
     "Address not set",
-    normalizedEmail,
+    ownerUserId,
   ).first<{ id: number }>();
 
   if (!household) throw new Error("The household could not be created.");
@@ -159,10 +158,10 @@ async function getOrCreateHousehold(database: D1Database, ownerEmail?: string, o
 
 export async function listUsageRecords(
   database: D1Database,
-  ownerEmail?: string,
+  ownerUserId?: string,
   ownerName?: string,
 ): Promise<UsageRecordDto[]> {
-  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
+  const householdId = await getOrCreateHousehold(database, ownerUserId, ownerName);
   const result = await database.prepare(`
     SELECT id, reading_date, utility_type, amount, unit, cost_cents, source
     FROM usage_records
@@ -177,10 +176,10 @@ export async function listUsageRecords(
 export async function insertUsageRecord(
   database: D1Database,
   input: NewUsageRecordInput,
-  ownerEmail: string,
+  ownerUserId: string,
   ownerName?: string,
 ) {
-  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
+  const householdId = await getOrCreateHousehold(database, ownerUserId, ownerName);
   const unit = units[input.category];
   const result = await database.prepare(`
     INSERT INTO usage_records
@@ -203,10 +202,10 @@ export async function insertUsageRecord(
 export async function insertUsageRecords(
   database: D1Database,
   inputs: NewUsageRecordInput[],
-  ownerEmail: string,
+  ownerUserId: string,
   ownerName?: string,
 ) {
-  const householdId = await getOrCreateHousehold(database, ownerEmail, ownerName);
+  const householdId = await getOrCreateHousehold(database, ownerUserId, ownerName);
   if (inputs.length === 0) return [];
 
   await database.batch(inputs.map((input) => database.prepare(`
@@ -222,5 +221,5 @@ export async function insertUsageRecords(
     input.costCents,
   )));
 
-  return listUsageRecords(database, ownerEmail, ownerName);
+  return listUsageRecords(database, ownerUserId, ownerName);
 }

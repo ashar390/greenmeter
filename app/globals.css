@@ -18,6 +18,78 @@
   --amber: #b56c1c;
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background:
+    radial-gradient(circle at 78% 22%, rgba(178, 201, 158, 0.42), transparent 28%),
+    #f3f3e9;
+}
+
+.auth-card {
+  width: min(100%, 520px);
+  padding: clamp(32px, 6vw, 56px);
+  border: 1px solid #d7dbcf;
+  border-radius: 24px;
+  background: rgba(255, 255, 252, 0.96);
+  box-shadow: 0 28px 70px rgba(25, 58, 43, 0.12);
+}
+
+.auth-brand {
+  width: fit-content;
+  margin-bottom: 48px;
+}
+
+.auth-eyebrow {
+  margin: 0 0 12px;
+  color: #216b4d;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.auth-card h1 {
+  margin: 0;
+  color: #113e2e;
+  font-size: clamp(2rem, 6vw, 3rem);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.auth-card > p:not(.auth-eyebrow, .auth-note) {
+  margin: 20px 0 0;
+  color: #52645c;
+  line-height: 1.65;
+}
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 32px;
+  padding: 14px 20px;
+}
+
+.auth-note {
+  margin: 16px 0 0;
+  color: #75827c;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.auth-back {
+  display: block;
+  width: fit-content;
+  margin: 26px auto 0;
+  color: #245d47;
+  font-size: 0.88rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: #f2f3ed; color: var(--ink); font-family: var(--font-geist-sans), Arial, sans-serif; font-size: 15px; line-height: 1.5; }

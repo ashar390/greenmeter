@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { calculateDashboardSummary, type ReportingPeriod } from "../../lib/dashboard-summary";
 import { emissionsFactors } from "../../lib/emissions";
 
@@ -17,7 +18,7 @@ type UsageRecord = {
   source: "Manual" | "Demo data" | "Utility sync" | "CSV import";
 };
 
-type Session = {
+type AccountSession = {
   authenticated: boolean;
   mode: "demo" | "personal";
   user: { email: string; displayName: string } | null;
@@ -29,7 +30,7 @@ type ImportPreview = {
   totalRows: number;
 };
 
-const signInPath = "/signin-with-chatgpt?return_to=%2Fdashboard";
+const signInPath = "/sign-in";
 
 function comparisonLabel(change: number | null) {
   if (change === null) return { className: "", text: "No previous data" };
@@ -47,7 +48,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState("");
   const [period, setPeriod] = useState<ReportingPeriod>("current");
-  const [session, setSession] = useState<Session>({ authenticated: false, mode: "demo", user: null });
+  const [session, setSession] = useState<AccountSession>({ authenticated: false, mode: "demo", user: null });
   const [showImport, setShowImport] = useState(false);
   const [importCsv, setImportCsv] = useState("");
   const [importFileName, setImportFileName] = useState("");
@@ -73,7 +74,7 @@ export default function Home() {
           fetch("/api/session", { signal: controller.signal }),
         ]);
         const data = await recordsResponse.json() as { records?: UsageRecord[]; error?: string };
-        const sessionData = await sessionResponse.json() as Session;
+        const sessionData = await sessionResponse.json() as AccountSession;
         if (!recordsResponse.ok || !data.records) throw new Error(data.error ?? "Usage records could not be loaded.");
         if (!sessionResponse.ok) throw new Error("Account status could not be loaded.");
         setRecords(data.records);
@@ -206,9 +207,9 @@ export default function Home() {
           <div className="account-area">
             <button className="help-button">Help</button>
             {session.authenticated ? (
-              <a className="account-button" href="/signout-with-chatgpt?return_to=%2F" aria-label="Sign out">
+              <button className="account-button" type="button" onClick={() => signOut({ callbackUrl: "/" })} aria-label="Sign out">
                 <span>{session.user?.displayName.slice(0, 2).toUpperCase()}</span><span className="account-name">{session.user?.displayName}</span><span>Sign out</span>
-              </a>
+              </button>
             ) : <a className="header-sign-in" href={signInPath}>Sign in</a>}
           </div>
         </div>

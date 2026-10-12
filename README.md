@@ -18,7 +18,8 @@ Implemented:
 - REST-style read and write API
 - EPA-based electricity and natural-gas emissions estimates
 - Public read-only demonstration mode
-- Authenticated household workspaces with server-side record isolation
+- GitHub OAuth with database-backed sessions
+- Authenticated household workspaces with server-side record isolation by account ID
 - Validated CSV import with preview, row-level errors, and source tracking
 - Unit, schema, and production-render tests
 
@@ -32,10 +33,16 @@ Not implemented yet:
 
 ```bash
 npm install
+npm run db:migrate:local
 npm run dev
 ```
 
 Open the local address printed in the terminal.
+
+Copy `.dev.vars.example` to `.dev.vars` and provide an Auth.js secret plus the
+credentials from a GitHub OAuth application. Keep `.dev.vars` private; it is
+ignored by Git. For local development, set the OAuth callback URL to
+`http://localhost:3000/api/auth/callback/github`.
 
 ## Verify the project
 
@@ -75,4 +82,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Replace the temporary identity bridge with provider-neutral application authentication.
+Move database initialization and demonstration seeding out of request handling.
