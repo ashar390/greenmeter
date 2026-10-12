@@ -9,6 +9,11 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "preview": "npm run build && WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler dev",
+    "deploy": "npm run build && WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy",
+    "cf:typegen": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types",
+    "db:migrate:local": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 migrations apply greenmeter-db --local",
+    "db:migrate:remote": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 migrations apply greenmeter-db --remote",
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

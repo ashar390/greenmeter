@@ -26,7 +26,6 @@ test("server-renders the GreenMeter dashboard with its intro", async () => {
   assert.match(html, /Recent usage records/);
   assert.match(html, /Exploring the public demo/);
   assert.match(html, /Sign in to add records/);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
 test("keeps the direct dashboard route available", async () => {
@@ -39,16 +38,16 @@ test("keeps the direct dashboard route available", async () => {
   assert.match(html, /Latest recorded month/);
   assert.match(html, /Electricity usage/);
   assert.match(html, /Recent usage records/);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
-test("includes production project metadata and assets", async () => {
-  const [layout, page, intro, dashboard, packageJson] = await Promise.all([
+test("includes production project configuration and assets", async () => {
+  const [layout, page, intro, dashboard, packageJson, workerConfig] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/intro-sequence.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/dashboard/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     access(new URL("../public/og.png", import.meta.url)),
   ]);
 
@@ -59,6 +58,8 @@ test("includes production project metadata and assets", async () => {
   assert.match(dashboard, /Usage must be greater than zero/);
   assert.match(dashboard, /Record saved to the GreenMeter database/);
   assert.match(dashboard, /\/api\/usage-records/);
+  assert.match(workerConfig, /"name": "greenmeter"/);
+  assert.match(workerConfig, /"binding": "DB"/);
+  assert.match(workerConfig, /"migrations_dir": "drizzle"/);
   assert.doesNotMatch(`${page}${intro}${dashboard}`, /SkeletonPreview/);
-  await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });

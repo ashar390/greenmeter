@@ -4,7 +4,7 @@ GreenMeter is a full-stack household utility dashboard for reviewing electricity
 
 ## Current milestone
 
-The current release connects a responsive React dashboard to a Cloudflare D1 database through validated API routes. Dashboard metrics and emissions estimates are derived from persisted records rather than hard-coded display values.
+The current release connects a responsive React dashboard to a Cloudflare D1 database through validated API routes and uses a standard Cloudflare Workers deployment configuration. Dashboard metrics and emissions estimates are derived from persisted records rather than hard-coded display values.
 
 Implemented:
 
@@ -45,6 +45,16 @@ npm test
 
 This creates a production build and executes the automated checks.
 
+## Preview the production Worker
+
+```bash
+npm run preview
+```
+
+The Worker configuration lives in `wrangler.jsonc`. Before the first remote
+deployment, create the production D1 database and replace the placeholder
+database ID in that file with the ID returned by Wrangler.
+
 ## Learn the architecture
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a beginner-friendly explanation of:
@@ -65,4 +75,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Add deployment observability and end-to-end production checks.
+Replace the temporary identity bridge with provider-neutral application authentication.
