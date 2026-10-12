@@ -1,4 +1,5 @@
 import { insertUsageRecords } from "../../../../db/usage-records";
+import { getDatabase } from "../../../../db/client";
 import { parseUsageCsv } from "../../../../lib/csv-import";
 import { auth } from "../../../../auth";
 import { getSessionUser } from "../../../../lib/session-user";
@@ -6,11 +7,6 @@ import { getSessionUser } from "../../../../lib/session-user";
 export const dynamic = "force-dynamic";
 
 const MAXIMUM_FILE_BYTES = 1_000_000;
-
-async function getDatabase() {
-  const { env } = await import("cloudflare:workers");
-  return env.DB as D1Database;
-}
 
 export async function POST(request: Request) {
   const user = getSessionUser(await auth());

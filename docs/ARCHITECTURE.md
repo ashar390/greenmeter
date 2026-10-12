@@ -127,7 +127,7 @@ Important design decisions:
 
 ## 6. Database
 
-The project uses **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**. The application now initializes its local tables, seeds clearly labeled demonstration records, reads them through an API, and persists new manual records.
+The project uses **Cloudflare D1**, a managed SQL database based on SQLite, with **Drizzle ORM**. Versioned migrations create the tables before the application starts, and a separate idempotent seed command loads the clearly labeled demonstration records.
 
 ### Why SQL?
 
@@ -265,6 +265,12 @@ Greenmeter/
 ```
 
 The schema is deliberately separate from API code. `db/schema.ts` describes the intended database, while `drizzle/` records the exact SQL needed to create it. This makes schema changes reviewable and repeatable across local, test, and hosted databases.
+
+The application never runs `CREATE TABLE`, migration, or seed statements during
+a web request. This separation matters in production: deployments control schema
+changes, while requests only read or write application data. `db/seed-demo.sql`
+is intentionally safe to run repeatedly, and `/api/health` verifies that the
+database schema and public demonstration household are ready.
 
 ## 11. Testing strategy
 

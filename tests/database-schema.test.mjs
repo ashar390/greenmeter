@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 const migrationsUrl = new URL("../drizzle/", import.meta.url);
+const demoSeedUrl = new URL("../db/seed-demo.sql", import.meta.url);
 
 async function createDatabase() {
   const database = new DatabaseSync(":memory:");
@@ -62,6 +63,26 @@ test("households use unique account IDs while addresses may be shared", async ()
     /FOREIGN KEY constraint failed/,
   );
 
+  database.close();
+});
+
+test("demonstration seed is explicit and idempotent", async () => {
+  const database = await createDatabase();
+  const seed = await readFile(demoSeedUrl, "utf8");
+
+  database.exec(seed);
+  database.exec(seed);
+
+  const demoHouseholds = database.prepare(`
+    SELECT COUNT(*) AS count FROM households
+    WHERE name = 'GreenMeter demo home' AND owner_user_id IS NULL
+  `).get();
+  const demoRecords = database.prepare(`
+    SELECT COUNT(*) AS count FROM usage_records WHERE source = 'demo_data'
+  `).get();
+
+  assert.equal(demoHouseholds.count, 1);
+  assert.equal(demoRecords.count, 5);
   database.close();
 });
 

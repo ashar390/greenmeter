@@ -5,6 +5,7 @@ import test from "node:test";
 import { insertUsageRecord, insertUsageRecords, listUsageRecords } from "../db/usage-records.ts";
 
 const migrationsUrl = new URL("../drizzle/", import.meta.url);
+const demoSeedUrl = new URL("../db/seed-demo.sql", import.meta.url);
 
 class D1StatementAdapter {
   constructor(statement, values = []) {
@@ -40,6 +41,7 @@ async function createD1Adapter() {
       if (statement.trim()) sqlite.exec(statement);
     }
   }
+  sqlite.exec(await readFile(demoSeedUrl, "utf8"));
 
   return {
     sqlite,

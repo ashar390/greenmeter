@@ -62,79 +62,25 @@ function toDto(row: UsageRow): UsageRecordDto {
   };
 }
 
-export async function ensureUsageDatabase(database: D1Database) {
-  await database.batch([
-    database.prepare(`
-      CREATE TABLE IF NOT EXISTS households (
-        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        name TEXT NOT NULL,
-        address TEXT NOT NULL,
-        owner_user_id TEXT UNIQUE,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
-        CONSTRAINT households_name_not_blank CHECK(length(trim(name)) > 0),
-        CONSTRAINT households_address_not_blank CHECK(length(trim(address)) > 0)
-      )
-    `),
-    database.prepare(`
-      CREATE TABLE IF NOT EXISTS usage_records (
-        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-        household_id INTEGER NOT NULL,
-        utility_type TEXT NOT NULL,
-        reading_date TEXT NOT NULL,
-        amount REAL NOT NULL,
-        unit TEXT NOT NULL,
-        cost_cents INTEGER NOT NULL,
-        source TEXT DEFAULT 'manual' NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        FOREIGN KEY (household_id) REFERENCES households(id) ON DELETE CASCADE,
-        CONSTRAINT usage_records_utility_type_valid CHECK(utility_type in ('electricity', 'gas', 'water')),
-        CONSTRAINT usage_records_amount_positive CHECK(amount > 0),
-        CONSTRAINT usage_records_unit_valid CHECK(unit in ('kWh', 'therms', 'gal')),
-        CONSTRAINT usage_records_cost_nonnegative CHECK(cost_cents >= 0),
-        CONSTRAINT usage_records_source_valid CHECK(source in ('manual', 'demo_data', 'utility_sync', 'csv_import')),
-        CONSTRAINT usage_records_date_iso CHECK(reading_date glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
-        UNIQUE(household_id, utility_type, reading_date)
-      )
-    `),
-    database.prepare(`
-      CREATE INDEX IF NOT EXISTS usage_records_household_date_idx
-      ON usage_records (household_id, reading_date)
-    `),
-  ]);
-
-  await database
-    .prepare("INSERT OR IGNORE INTO households (name, address) VALUES (?, ?)")
-    .bind(DEMO_HOUSEHOLD_NAME, DEMO_ADDRESS)
-    .run();
-
+async function getDemoHouseholdId(database: D1Database) {
   const household = await database
-    .prepare("SELECT id FROM households WHERE address = ?")
-    .bind(DEMO_ADDRESS)
+    .prepare(`
+      SELECT id
+      FROM households
+      WHERE name = ? AND address = ? AND owner_user_id IS NULL
+      LIMIT 1
+    `)
+    .bind(DEMO_HOUSEHOLD_NAME, DEMO_ADDRESS)
     .first<{ id: number }>();
 
-  if (!household) throw new Error("The demonstration household could not be initialized.");
-
-  const demoRecords = [
-    ["electricity", "2026-09-18", 18.4, "kWh", 261],
-    ["electricity", "2026-09-17", 21.2, "kWh", 301],
-    ["gas", "2026-09-16", 0.8, "therms", 112],
-    ["water", "2026-09-15", 126, "gal", 74],
-    ["electricity", "2026-09-14", 16.7, "kWh", 237],
-  ] as const;
-
-  await database.batch(demoRecords.map((record) => database.prepare(`
-    INSERT OR IGNORE INTO usage_records
-      (household_id, utility_type, reading_date, amount, unit, cost_cents, source)
-    VALUES (?, ?, ?, ?, ?, ?, 'demo_data')
-  `).bind(household.id, ...record)));
-
+  if (!household) {
+    throw new Error("GreenMeter demo data is not seeded. Run the database seed command.");
+  }
   return household.id;
 }
 
 async function getOrCreateHousehold(database: D1Database, ownerUserId?: string, ownerName?: string) {
-  const demoHouseholdId = await ensureUsageDatabase(database);
-  if (!ownerUserId) return demoHouseholdId;
+  if (!ownerUserId) return getDemoHouseholdId(database);
 
   const existing = await database
     .prepare("SELECT id FROM households WHERE owner_user_id = ?")

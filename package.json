@@ -14,6 +14,9 @@
     "cf:typegen": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types",
     "db:migrate:local": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 migrations apply greenmeter-db --local",
     "db:migrate:remote": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 migrations apply greenmeter-db --remote",
+    "db:seed:local": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 execute greenmeter-db --local --file=db/seed-demo.sql",
+    "db:seed:remote": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 execute greenmeter-db --remote --file=db/seed-demo.sql",
+    "db:setup:local": "npm run db:migrate:local && npm run db:seed:local",
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

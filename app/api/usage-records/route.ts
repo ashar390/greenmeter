@@ -1,15 +1,11 @@
 import { insertUsageRecord, listUsageRecords, type UtilityType } from "../../../db/usage-records";
+import { getDatabase } from "../../../db/client";
 import { auth } from "../../../auth";
 import { getSessionUser } from "../../../lib/session-user";
 
 export const dynamic = "force-dynamic";
 
 const utilityTypes = new Set<UtilityType>(["electricity", "gas", "water"]);
-
-async function getDatabase() {
-  const { env } = await import("cloudflare:workers");
-  return env.DB as D1Database;
-}
 
 function isIsoDate(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

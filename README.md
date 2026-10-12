@@ -21,6 +21,8 @@ Implemented:
 - GitHub OAuth with database-backed sessions
 - Authenticated household workspaces with server-side record isolation by account ID
 - Validated CSV import with preview, row-level errors, and source tracking
+- Explicit, repeatable database migrations and demonstration-data seeding
+- Database readiness endpoint at `/api/health`
 - Unit, schema, and production-render tests
 
 Not implemented yet:
@@ -33,7 +35,7 @@ Not implemented yet:
 
 ```bash
 npm install
-npm run db:migrate:local
+npm run db:setup:local
 npm run dev
 ```
 
@@ -51,6 +53,21 @@ npm test
 ```
 
 This creates a production build and executes the automated checks.
+
+## Database workflow
+
+Schema changes belong in versioned files under `drizzle/`. Application requests
+never create or alter tables. The demonstration household is also separate from
+the schema and can be loaded safely more than once:
+
+```bash
+npm run db:migrate:local
+npm run db:seed:local
+```
+
+For production, use `db:migrate:remote` followed by `db:seed:remote`. The
+`/api/health` endpoint returns HTTP 200 only when the expected tables and the
+demonstration household are available.
 
 ## Preview the production Worker
 
@@ -82,4 +99,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Move database initialization and demonstration seeding out of request handling.
+Create the production D1 database, configure deployment secrets, and perform end-to-end production checks.
