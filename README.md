@@ -1,10 +1,22 @@
 # GreenMeter
 
-GreenMeter is a full-stack household utility dashboard for reviewing electricity, water, and natural-gas usage. It persists utility records, calculates period-over-period trends, and estimates emissions with documented U.S. Environmental Protection Agency factors.
+GreenMeter is a full-stack household utility tracking application that brings electricity, water, and natural-gas records into one private dashboard. Users can enter readings individually or import a CSV, review billing-period totals and trends, and estimate household emissions using documented U.S. Environmental Protection Agency factors.
+
+**Live application:** [greenmeter.anusha-sharma.workers.dev](https://greenmeter.anusha-sharma.workers.dev)
+
+The public demo can be explored without an account. GitHub sign-in creates a private household workspace whose records are isolated from other users on the server.
+
+## Technology
+
+- **Frontend:** React, TypeScript, and CSS
+- **Application runtime:** Cloudflare Workers
+- **Database:** Cloudflare D1 (SQLite) with versioned SQL migrations
+- **Authentication:** Auth.js with GitHub OAuth and database-backed sessions
+- **Testing:** Vitest and production-render checks
 
 ## Current milestone
 
-The current release connects a responsive React dashboard to a Cloudflare D1 database through validated API routes and uses a standard Cloudflare Workers deployment configuration. Dashboard metrics and emissions estimates are derived from persisted records rather than hard-coded display values.
+The current release is deployed publicly on Cloudflare Workers. It connects a responsive React dashboard to a production D1 database through validated API routes. Dashboard metrics and emissions estimates are calculated from persisted records rather than hard-coded display values.
 
 Implemented:
 
@@ -24,12 +36,12 @@ Implemented:
 - Explicit, repeatable database migrations and demonstration-data seeding
 - Database readiness endpoint at `/api/health`
 - Unit, schema, and production-render tests
+- Public production deployment
 
 Not implemented yet:
 
 - Direct utility-company API integrations
 - Water emissions calculations
-- Public production deployment
 
 ## Start locally
 
@@ -69,15 +81,27 @@ For production, use `db:migrate:remote` followed by `db:seed:remote`. The
 `/api/health` endpoint returns HTTP 200 only when the expected tables and the
 demonstration household are available.
 
-## Preview the production Worker
+## Deployment
+
+The production application is available at:
+
+**[https://greenmeter.anusha-sharma.workers.dev](https://greenmeter.anusha-sharma.workers.dev)**
+
+Build and deploy the Worker with:
+
+```bash
+npm run deploy
+```
+
+Production credentials are stored as encrypted Worker secrets and are never committed to the repository. The production D1 binding is defined in `wrangler.jsonc`.
+
+To preview the production Worker locally:
 
 ```bash
 npm run preview
 ```
 
-The Worker configuration lives in `wrangler.jsonc`. Before the first remote
-deployment, create the production D1 database and replace the placeholder
-database ID in that file with the ID returned by Wrangler.
+The Worker configuration lives in `wrangler.jsonc`.
 
 ## Learn the architecture
 
@@ -99,4 +123,4 @@ These results are estimates based on recorded activity and are not utility-certi
 
 ## Next milestone
 
-Create the production D1 database, configure deployment secrets, and perform end-to-end production checks.
+Add a production-ready utility-provider integration while preserving manual entry and CSV import as reliable alternatives.
