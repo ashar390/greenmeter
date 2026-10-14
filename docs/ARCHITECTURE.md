@@ -110,7 +110,7 @@ type UsageRecord = {
   amount: number;
   unit: string;
   cost: number;
-  source: "Manual" | "Demo data" | "Utility sync";
+  source: "Manual" | "Demo data" | "Utility sync" | "CSV import" | "Green Button";
 };
 ```
 
@@ -155,7 +155,8 @@ Drizzle maps TypeScript code to SQL tables. It gives us type checking while stil
 
 ```text
 households
-  id, name, address, owner_user_id, created_at
+  id, name, address, owner_user_id, city, state_code, postal_code,
+  egrid_subregion, water_source, created_at
 
 users, accounts, sessions, verification_tokens
   account identity and database-backed sessions
@@ -209,6 +210,12 @@ Loading the dashboard works like this:
 7. React renders the returned records and calculated totals
 ```
 
+Signed-in dashboards also request `GET /api/household`. The returned eGRID
+region and water-source selection are passed into the pure calculation service,
+so changing a household setting recalculates the estimates without changing the
+underlying usage records. `PUT /api/household` validates and saves those private
+settings for the authenticated account only.
+
 Adding a record will work like this:
 
 ```text
@@ -247,10 +254,12 @@ Greenmeter/
 │   ├── api/auth/register/route.ts
 │   ├── api/auth/email-session/route.ts
 │   ├── api/session/route.ts
+│   ├── api/household/route.ts
 │   ├── api/usage-records/route.ts
 │   └── globals.css       # Visual system and responsive styles
 ├── db/
 │   ├── schema.ts         # Typed definitions for the SQL tables
+│   ├── household-settings.ts # Private location and factor queries
 │   └── usage-records.ts  # Prepared queries and row-to-API mapping
 ├── lib/
 │   ├── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
@@ -299,15 +308,16 @@ We will build the project in this order:
 4. **Write API — complete.** Validate and save manually entered records.
 5. **Dashboard calculation service — complete.** Derive totals, costs, comparisons, goals, and chart values from saved records.
 6. **Error/loading states — complete.** Handle slow, empty, incomplete, or failed requests honestly.
-7. **Emissions service — complete.** Estimate electricity and gas emissions with documented EPA factors and explicit exclusions.
+7. **Emissions service — complete.** Estimate electricity, gas, and water emissions with documented EPA/DOE factors and household-selected regional assumptions.
 8. **Authentication and authorization — complete.** Keep the demo public and read-only while scoping authenticated API operations to the signed-in household.
 9. **CSV import — complete.** Preview, validate, and atomically persist authenticated bulk utility records with provenance.
+10. **Green Button XML import — complete.** Parse ESPI interval data, validate supported commodities and units, aggregate daily records, preview results, and persist confirmed imports with provenance.
 10. **Deployment and observability.** Publish, log errors, and measure health.
 
 This order minimizes hidden complexity. Authentication was added after the data flow so its authorization boundaries could be tested independently.
 
 ## 13. What you may claim today
 
-You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, added a validated bulk CSV ingestion workflow, and created unit-tested services for period analytics and EPA-based carbon estimates.
+You can currently say that you built a responsive React/TypeScript energy dashboard, designed a tested relational SQL schema, implemented authenticated REST-style APIs with household-level data isolation, added validated CSV and Green Button ESPI XML ingestion workflows, and created unit-tested services for regional EPA/DOE-based carbon estimates.
 
-Do **not** yet claim Spring Boot, real utility integrations, water emissions, or utility-certified carbon accounting. Public provider rows are demonstration data, and authenticated records are manually entered.
+Do **not** yet claim Spring Boot, direct utility-account synchronization, automatic utility-region detection, or utility-certified carbon accounting. Public provider rows are demonstration data, and authenticated records are manually entered or imported from CSV or user-supplied Green Button XML exports.

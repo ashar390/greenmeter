@@ -60,11 +60,19 @@ export const households = sqliteTable("households", {
   name: text("name").notNull(),
   address: text("address").notNull(),
   ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
+  city: text("city"),
+  stateCode: text("state_code"),
+  postalCode: text("postal_code"),
+  egridSubregion: text("egrid_subregion").notNull().default("AZNM"),
+  waterSource: text("water_source", { enum: ["local_surface", "local_groundwater", "distant_watershed"] }).notNull().default("local_surface"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   uniqueIndex("households_owner_user_id_unique").on(table.ownerUserId),
   check("households_name_not_blank", sql`length(trim(${table.name})) > 0`),
   check("households_address_not_blank", sql`length(trim(${table.address})) > 0`),
+  check("households_state_code_valid", sql`${table.stateCode} is null or ${table.stateCode} glob '[A-Z][A-Z]'`),
+  check("households_postal_code_valid", sql`${table.postalCode} is null or ${table.postalCode} glob '[0-9][0-9][0-9][0-9][0-9]'`),
+  check("households_water_source_valid", sql`${table.waterSource} in ('local_surface', 'local_groundwater', 'distant_watershed')`),
 ]);
 
 export const usageRecords = sqliteTable("usage_records", {
@@ -77,7 +85,7 @@ export const usageRecords = sqliteTable("usage_records", {
   amount: real("amount").notNull(),
   unit: text("unit", { enum: ["kWh", "therms", "gal"] }).notNull(),
   costCents: integer("cost_cents").notNull(),
-  source: text("source", { enum: ["manual", "demo_data", "utility_sync", "csv_import"] }).notNull().default("manual"),
+  source: text("source", { enum: ["manual", "demo_data", "utility_sync", "csv_import", "green_button"] }).notNull().default("manual"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("usage_records_household_date_idx").on(table.householdId, table.readingDate),
@@ -90,7 +98,7 @@ export const usageRecords = sqliteTable("usage_records", {
   check("usage_records_amount_positive", sql`${table.amount} > 0`),
   check("usage_records_unit_valid", sql`${table.unit} in ('kWh', 'therms', 'gal')`),
   check("usage_records_cost_nonnegative", sql`${table.costCents} >= 0`),
-  check("usage_records_source_valid", sql`${table.source} in ('manual', 'demo_data', 'utility_sync', 'csv_import')`),
+  check("usage_records_source_valid", sql`${table.source} in ('manual', 'demo_data', 'utility_sync', 'csv_import', 'green_button')`),
   check("usage_records_date_iso", sql`${table.readingDate} glob '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`),
 ]);
 

@@ -43,6 +43,20 @@
       "when": 1791954101513,
       "tag": "0005_add_password_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791973297095,
+      "tag": "0006_add_household_location",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791973611346,
+      "tag": "0007_add_green_button_source",
+      "breakpoints": true
     }
   ]
 }

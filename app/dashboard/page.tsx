@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { calculateDashboardSummary, type ReportingPeriod } from "../../lib/dashboard-summary";
-import { emissionsFactors } from "../../lib/emissions";
+import { egridRegions, electricityFactorFor, emissionsFactors, waterSources, type EgridRegionCode, type WaterSource } from "../../lib/emissions";
 
 type Utility = "Electricity" | "Gas" | "Water";
 
@@ -15,7 +16,7 @@ type UsageRecord = {
   amount: number;
   unit: string;
   cost: number;
-  source: "Manual" | "Demo data" | "Utility sync" | "CSV import";
+  source: "Manual" | "Demo data" | "Utility sync" | "CSV import" | "Green Button";
 };
 
 type AccountSession = {
@@ -26,8 +27,28 @@ type AccountSession = {
 
 type ImportPreview = {
   rows: Array<{ date: string; category: string; amount: number; costCents: number }>;
-  errors: Array<{ row: number; message: string }>;
+  errors: Array<{ row?: number; entry?: number; message: string }>;
+  warnings?: string[];
+  totalIntervals?: number;
   totalRows: number;
+};
+
+type ImportFormat = "csv" | "green_button";
+
+type HouseholdSettings = {
+  city: string;
+  stateCode: string;
+  postalCode: string;
+  egridSubregion: EgridRegionCode;
+  waterSource: WaterSource;
+};
+
+const defaultHouseholdSettings: HouseholdSettings = {
+  city: "",
+  stateCode: "",
+  postalCode: "",
+  egridSubregion: "AZNM",
+  waterSource: "local_surface",
 };
 
 const signInPath = "/sign-in";
@@ -41,6 +62,12 @@ function comparisonLabel(change: number | null) {
   };
 }
 
+function UtilityIcon({ utility }: { utility: Utility }) {
+  if (utility === "Electricity") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 2 5.8 13h5.1L10 22l8.2-12h-5.4l.4-8Z" /></svg>;
+  if (utility === "Water") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8S5.7 9.7 5.7 14.2a6.3 6.3 0 0 0 12.6 0C18.3 9.7 12 2.8 12 2.8Z" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.8 2.5c.5 3.6-2.7 4.8-2.7 7.5 0 1.3.8 2.2 1.8 2.8-.2-2.2 1.7-3.6 3-5.5 1.7 2.1 3 4.4 3 7.2A6.8 6.8 0 0 1 5.3 14c0-3.9 2.5-6.6 8.5-11.5Z" /></svg>;
+}
+
 export default function Home() {
   const [records, setRecords] = useState<UsageRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
@@ -50,12 +77,20 @@ export default function Home() {
   const [period, setPeriod] = useState<ReportingPeriod>("current");
   const [session, setSession] = useState<AccountSession>({ authenticated: false, mode: "demo", user: null });
   const [showImport, setShowImport] = useState(false);
-  const [importCsv, setImportCsv] = useState("");
+  const [importFormat, setImportFormat] = useState<ImportFormat>("csv");
+  const [importContents, setImportContents] = useState("");
   const [importFileName, setImportFileName] = useState("");
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
+  const [householdSettings, setHouseholdSettings] = useState(defaultHouseholdSettings);
+  const [showHouseholdSettings, setShowHouseholdSettings] = useState(false);
+  const [savingHousehold, setSavingHousehold] = useState(false);
+  const [chartUtility, setChartUtility] = useState<Utility>("Electricity");
 
-  const summary = useMemo(() => calculateDashboardSummary(records, period), [records, period]);
+  const summary = useMemo(() => calculateDashboardSummary(records, period, {
+    region: householdSettings.egridSubregion,
+    waterSource: householdSettings.waterSource,
+  }), [records, period, householdSettings.egridSubregion, householdSettings.waterSource]);
   const electricityComparison = comparisonLabel(summary.electricity.changePercent);
   const waterComparison = comparisonLabel(summary.water.changePercent);
   const gasComparison = comparisonLabel(summary.gas.changePercent);
@@ -63,6 +98,11 @@ export default function Home() {
   const achievedReduction = summary.electricity.changePercent === null
     ? null
     : Math.max(0, -summary.electricity.changePercent);
+  const chartSeries = summary.utilityDays[chartUtility];
+  const chartTotal = chartUtility === "Electricity" ? summary.electricity : chartUtility === "Water" ? summary.water : summary.gas;
+  const chartAverage = summary.utilityAverages[chartUtility];
+  const chartHighest = summary.utilityHighest[chartUtility];
+  const chartMaximum = summary.utilityChartMaximum[chartUtility];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,6 +119,12 @@ export default function Home() {
         if (!sessionResponse.ok) throw new Error("Account status could not be loaded.");
         setRecords(data.records);
         setSession(sessionData);
+        if (sessionData.authenticated) {
+          const householdResponse = await fetch("/api/household", { signal: controller.signal });
+          const householdData = await householdResponse.json() as { settings?: HouseholdSettings; error?: string };
+          if (!householdResponse.ok || !householdData.settings) throw new Error(householdData.error ?? "Household settings could not be loaded.");
+          setHouseholdSettings(householdData.settings);
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setNotice(error instanceof Error ? error.message : "Usage records could not be loaded.");
@@ -141,25 +187,28 @@ export default function Home() {
     setImportPreview(null);
     setNotice("");
 
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setNotice("Choose a .csv file using the GreenMeter template.");
+    const expectedExtension = importFormat === "csv" ? ".csv" : ".xml";
+    if (!file.name.toLowerCase().endsWith(expectedExtension)) {
+      setNotice(importFormat === "csv"
+        ? "Choose a .csv file using the GreenMeter template."
+        : "Choose a .xml Green Button usage-data export.");
       return;
     }
 
-    const csv = await file.text();
-    setImportCsv(csv);
+    const contents = await file.text();
+    setImportContents(contents);
     setImporting(true);
     try {
-      const response = await fetch("/api/usage-records/import", {
+      const response = await fetch(importFormat === "csv" ? "/api/usage-records/import" : "/api/usage-records/import-green-button", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ csv, confirm: false }),
+        body: JSON.stringify(importFormat === "csv" ? { csv: contents, confirm: false } : { xml: contents, confirm: false }),
       });
       const data = await response.json() as ImportPreview & { error?: string };
-      if (!response.ok) throw new Error(data.error ?? "The CSV could not be previewed.");
+      if (!response.ok) throw new Error(data.error ?? "The utility file could not be previewed.");
       setImportPreview(data);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The CSV could not be previewed.");
+      setNotice(error instanceof Error ? error.message : "The utility file could not be previewed.");
     } finally {
       setImporting(false);
     }
@@ -170,23 +219,54 @@ export default function Home() {
     setImporting(true);
     setNotice("");
     try {
-      const response = await fetch("/api/usage-records/import", {
+      const response = await fetch(importFormat === "csv" ? "/api/usage-records/import" : "/api/usage-records/import-green-button", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ csv: importCsv, confirm: true }),
+        body: JSON.stringify(importFormat === "csv"
+          ? { csv: importContents, confirm: true }
+          : { xml: importContents, confirm: true }),
       });
       const data = await response.json() as { imported?: number; records?: UsageRecord[]; error?: string };
-      if (!response.ok || !data.records) throw new Error(data.error ?? "The CSV could not be imported.");
+      if (!response.ok || !data.records) throw new Error(data.error ?? "The utility file could not be imported.");
       setRecords(data.records);
       setNotice(`${data.imported} records imported successfully.`);
       setShowImport(false);
-      setImportCsv("");
+      setImportContents("");
       setImportFileName("");
       setImportPreview(null);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The CSV could not be imported.");
+      setNotice(error instanceof Error ? error.message : "The utility file could not be imported.");
     } finally {
       setImporting(false);
+    }
+  }
+
+  async function saveHouseholdSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSavingHousehold(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/household", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          city: String(form.get("city")),
+          stateCode: String(form.get("stateCode")),
+          postalCode: String(form.get("postalCode")),
+          egridSubregion: String(form.get("egridSubregion")),
+          waterSource: String(form.get("waterSource")),
+        }),
+      });
+      const data = await response.json() as { settings?: HouseholdSettings; error?: string };
+      if (!response.ok || !data.settings) throw new Error(data.error ?? "Household settings could not be saved.");
+      setHouseholdSettings(data.settings);
+      setShowHouseholdSettings(false);
+      setNotice("Household location and regional factors updated.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Household settings could not be saved.");
+    } finally {
+      setSavingHousehold(false);
     }
   }
 
@@ -207,9 +287,9 @@ export default function Home() {
           <div className="account-area">
             <button className="help-button">Help</button>
             {session.authenticated ? (
-              <button className="account-button" type="button" onClick={() => signOut({ callbackUrl: "/" })} aria-label="Sign out">
+              <><button className="location-button" type="button" onClick={() => setShowHouseholdSettings((current) => !current)}>Household</button><button className="account-button" type="button" onClick={() => signOut({ callbackUrl: "/" })} aria-label="Sign out">
                 <span>{session.user?.displayName.slice(0, 2).toUpperCase()}</span><span className="account-name">{session.user?.displayName}</span><span>Sign out</span>
-              </button>
+              </button></>
             ) : <a className="header-sign-in" href={signInPath}>Sign in</a>}
           </div>
         </div>
@@ -222,14 +302,25 @@ export default function Home() {
             <a href={signInPath}>Sign in to start</a>
           </section>
         )}
-        <section className="page-heading">
-          <div>
-            <div className="breadcrumbs">Home <span>/</span> {session.mode === "demo" ? "Demonstration household" : "My household"}</div>
-            <h1>Energy overview</h1>
-            <p>Usage, cost, and emissions estimates for this billing cycle.</p>
-          </div>
+        {session.authenticated && showHouseholdSettings && (
+          <section className="household-settings" aria-label="Household location settings">
+            <div className="settings-intro"><span>Household profile</span><h2>Location and calculation factors</h2><p>GreenMeter uses your confirmed EPA grid region for electricity and water estimates. Your location remains private to your account.</p></div>
+            <form onSubmit={saveHouseholdSettings}>
+              <div className="location-fields">
+                <label>City<input name="city" defaultValue={householdSettings.city} placeholder="Tempe" required /></label>
+                <label>State<input name="stateCode" defaultValue={householdSettings.stateCode} placeholder="AZ" minLength={2} maxLength={2} required /></label>
+                <label>ZIP code<input name="postalCode" defaultValue={householdSettings.postalCode} placeholder="85281" inputMode="numeric" pattern="[0-9]{5}" required /></label>
+              </div>
+              <label>EPA eGRID region<select name="egridSubregion" defaultValue={householdSettings.egridSubregion}>{Object.entries(egridRegions).map(([code, region]) => <option key={code} value={code}>{code} — {region.name}</option>)}</select><small>Confirm your region with EPA Power Profiler using your ZIP code and electricity provider.</small></label>
+              <label>Primary water supply<select name="waterSource" defaultValue={householdSettings.waterSource}>{Object.entries(waterSources).map(([code, source]) => <option key={code} value={code}>{source.name} · {source.range}</option>)}</select><small>DOE generalized energy ranges; this estimates supply, treatment, and distribution rather than household water heating.</small></label>
+              <div className="settings-actions"><a href="https://www.epa.gov/egrid/power-profiler" target="_blank" rel="noreferrer">Open EPA Power Profiler</a><button className="primary-button" type="submit" disabled={savingHousehold}>{savingHousehold ? "Saving…" : "Save household"}</button></div>
+            </form>
+          </section>
+        )}
+        <section className="dashboard-filter-row" aria-label="Dashboard controls">
+          <div><span className="status-dot" /><div><strong>{session.mode === "demo" ? "Demonstration household" : "My household"}</strong><span>{summary.daysRecorded} days with recorded activity</span></div></div>
           <div className="page-controls">
-            <label htmlFor="period">Reporting period</label>
+            <label htmlFor="period">Reporting period <span>{summary.dateRangeLabel}</span></label>
             <select id="period" value={period} onChange={(event) => setPeriod(event.target.value as ReportingPeriod)}>
               <option value="current">Latest recorded month</option>
               <option value="previous">Previous month</option>
@@ -238,63 +329,65 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="billing-strip" aria-label="Billing cycle status">
-          <div>
-            <span className="status-dot" />
-            <div><strong>{summary.periodLabel}</strong><span>{summary.dateRangeLabel} · {summary.daysRecorded} days reported</span></div>
+        <section className="dashboard-hero" aria-label="Current household insight">
+          <div className="hero-copy">
+            <div className="dashboard-eyebrow">A clearer view of home</div>
+            <h1>Your home,<br />in balance.</h1>
+            <p>Understand how electricity, water, and natural gas shape your household costs and environmental footprint.</p>
+            <a className="primary-button" href="#usage">View usage trend <span aria-hidden="true">→</span></a>
           </div>
-          <div className="billing-progress" aria-label={`${summary.reportingProgress.toFixed(0)} percent of days have readings`}><span style={{ width: `${summary.reportingProgress}%` }} /></div>
-          <div className="bill-estimate"><span>Recorded cost</span><strong>${summary.totalCost.toFixed(2)}</strong></div>
-        </section>
-
-        <section className="impact-note" aria-label="Current sustainability insight">
-          <div className="impact-number">{summary.emissions.totalKg.toLocaleString()}<span>kg</span></div>
-          <div><strong>Estimated household emissions</strong><p>Calculated from recorded electricity and natural-gas usage for this period.</p></div>
-          <a href="#emissions-method">See methodology <span aria-hidden="true">→</span></a>
+          <div className="hero-insight">
+            <Image className="hero-graphic" src="/greenmeter-home-graphic.png" alt="Illustrated sustainable home among rolling hills and trees" width={1756} height={896} priority />
+            <span>Current insight</span>
+            <h2>{summary.emissions.totalKg.toLocaleString()} kg CO₂e</h2>
+            <p>Estimated household emissions for {summary.dateRangeLabel}.</p>
+            <div className="insight-stats">
+              <div><span>Recorded cost</span><strong>${summary.totalCost.toFixed(2)}</strong></div>
+              <div><span>Reporting coverage</span><strong>{summary.reportingProgress.toFixed(0)}%</strong></div>
+              <div><span>Compared with prior period</span><strong className={emissionsComparison.className}>{emissionsComparison.text}</strong></div>
+            </div>
+          </div>
         </section>
 
         <section className="summary-grid" aria-label="Utility summary">
-          <article className="summary-card">
-            <div className="summary-label"><span className="utility-mark electricity" />Electricity</div>
+          <article className="summary-card electricity-card">
+            <div className="summary-label"><span className="utility-icon electricity"><UtilityIcon utility="Electricity" /></span>Electricity</div>
             <div className="summary-value">{summary.electricity.amount.toLocaleString()} <small>{summary.electricity.unit}</small></div>
             <div className="summary-meta"><span className={electricityComparison.className}>{electricityComparison.text}</span><span>{summary.electricity.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
-          <article className="summary-card">
-            <div className="summary-label"><span className="utility-mark water" />Water</div>
+          <article className="summary-card water-card">
+            <div className="summary-label"><span className="utility-icon water"><UtilityIcon utility="Water" /></span>Water</div>
             <div className="summary-value">{summary.water.amount.toLocaleString()} <small>{summary.water.unit}</small></div>
             <div className="summary-meta"><span className={waterComparison.className}>{waterComparison.text}</span><span>{summary.water.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
-          <article className="summary-card">
-            <div className="summary-label"><span className="utility-mark gas" />Natural gas</div>
+          <article className="summary-card gas-card">
+            <div className="summary-label"><span className="utility-icon gas"><UtilityIcon utility="Gas" /></span>Natural gas</div>
             <div className="summary-value">{summary.gas.amount.toLocaleString()} <small>{summary.gas.unit}</small></div>
             <div className="summary-meta"><span className={gasComparison.className}>{gasComparison.text}</span><span>{summary.gas.changePercent === null ? "" : "than prior period"}</span></div>
-          </article>
-          <article className="summary-card">
-            <div className="summary-label">Estimated emissions</div>
-            <div className="summary-value">{summary.emissions.totalKg.toLocaleString()} <small>kg CO₂e</small></div>
-            <div className="summary-meta"><span className={emissionsComparison.className}>{emissionsComparison.text}</span><span>{summary.emissions.changePercent === null ? "" : "than prior period"}</span></div>
           </article>
         </section>
 
         <section className="content-grid" id="usage">
           <article className="card usage-card">
             <div className="card-header">
-              <div><h2>Electricity usage</h2><p>Recorded consumption for {summary.dateRangeLabel}</p></div>
-              <div className="legend"><span /><span>Recorded usage</span><i />Period average</div>
+              <div><h2>Utility usage trend</h2><p>Recorded consumption for {summary.dateRangeLabel}</p></div>
+              <div className="utility-chart-tabs" aria-label="Chart utility">
+                {(["Electricity", "Water", "Gas"] as Utility[]).map((utility) => <button key={utility} type="button" className={`${utility.toLowerCase()} ${chartUtility === utility ? "active" : ""}`} onClick={() => setChartUtility(utility)}><UtilityIcon utility={utility} />{utility}</button>)}
+              </div>
             </div>
             <div className="chart-summary">
-              <div><span>Period total</span><strong>{summary.electricity.amount.toLocaleString()} kWh</strong></div>
-              <div><span>Recorded-day average</span><strong>{summary.electricityAverage === null ? "—" : `${summary.electricityAverage} kWh`}</strong></div>
-              <div><span>Highest recorded day</span><strong>{summary.electricityHighest === null ? "—" : `${summary.electricityHighest} kWh`}</strong></div>
+              <div><span>Period total</span><strong>{chartTotal.amount.toLocaleString()} {chartTotal.unit}</strong></div>
+              <div><span>Recorded-day average</span><strong>{chartAverage === null ? "—" : `${chartAverage} ${chartTotal.unit}`}</strong></div>
+              <div><span>Highest recorded day</span><strong>{chartHighest === null ? "—" : `${chartHighest} ${chartTotal.unit}`}</strong></div>
             </div>
-            <div className="chart" aria-label={`Electricity consumption for ${summary.dateRangeLabel}`}>
-              <div className="axis-labels"><span>{summary.chartMaximum}</span><span>{Math.round(summary.chartMaximum * .67)}</span><span>{Math.round(summary.chartMaximum * .33)}</span><span>0</span></div>
+            <div className={`chart ${chartUtility.toLowerCase()}-chart`} aria-label={`${chartUtility} consumption for ${summary.dateRangeLabel}`}>
+              <div className="axis-labels"><span>{chartMaximum}</span><span>{Math.round(chartMaximum * .67)}</span><span>{Math.round(chartMaximum * .33)}</span><span>0</span></div>
               <div className="chart-plot">
-                {summary.electricityAverage !== null && <div className="average-line" style={{ bottom: `${(summary.electricityAverage / summary.chartMaximum) * 100}%` }}><span>Average {summary.electricityAverage}</span></div>}
-                {summary.electricityDays.length === 0 && <div className="chart-empty">No electricity readings for this period</div>}
-                {summary.electricityDays.map((day) => (
+                {chartAverage !== null && <div className="average-line" style={{ bottom: `${(chartAverage / chartMaximum) * 100}%` }}><span>Average {chartAverage}</span></div>}
+                {chartSeries.length === 0 && <div className="chart-empty">No {chartUtility.toLowerCase()} readings for this period</div>}
+                {chartSeries.map((day) => (
                   <div className="chart-column" key={day.date}>
-                    <div className="chart-bar" style={{ height: `${(day.amount / summary.chartMaximum) * 100}%` }} title={`${day.label}: ${day.amount} kWh`} />
+                    <div className="chart-bar" style={{ height: `${(day.amount / chartMaximum) * 100}%` }} title={`${day.label}: ${day.amount} ${chartTotal.unit}`} />
                     <small>{day.label}</small>
                   </div>
                 ))}
@@ -311,12 +404,13 @@ export default function Home() {
             </article>
             <article className="card emissions-card" id="emissions-method">
               <h2>How this estimate works</h2>
-              <p><strong>{summary.emissions.electricityKg} kg</strong> from electricity plus <strong>{summary.emissions.gasKg} kg</strong> from natural-gas combustion. Water is excluded because no water emissions factor is configured.</p>
+              <p><strong>{summary.emissions.electricityKg} kg</strong> from electricity, <strong>{summary.emissions.gasKg} kg</strong> from natural-gas combustion, and <strong>{summary.emissions.waterKg} kg</strong> from water supply and treatment.</p>
               <div className="factor-list">
-                <a href={emissionsFactors.electricity.sourceUrl} target="_blank" rel="noreferrer"><span>Electricity</span><strong>{emissionsFactors.electricity.value.toFixed(3)} kg/kWh</strong><small>{emissionsFactors.electricity.region} · {emissionsFactors.electricity.dataYear}</small></a>
+                <a href={emissionsFactors.electricity.sourceUrl} target="_blank" rel="noreferrer"><span>Electricity</span><strong>{electricityFactorFor(householdSettings.egridSubregion).toFixed(3)} kg/kWh</strong><small>EPA eGRID {householdSettings.egridSubregion} · {egridRegions[householdSettings.egridSubregion].name} · 2023</small></a>
                 <a href={emissionsFactors.naturalGas.sourceUrl} target="_blank" rel="noreferrer"><span>Natural gas</span><strong>{emissionsFactors.naturalGas.value.toFixed(3)} kg/therm</strong><small>{emissionsFactors.naturalGas.sourceName}</small></a>
+                <a href={emissionsFactors.water.sourceUrl} target="_blank" rel="noreferrer"><span>Water supply</span><strong>{waterSources[householdSettings.waterSource].kwhPerKgal} kWh/kgal</strong><small>{waterSources[householdSettings.waterSource].name} · DOE generalized midpoint</small></a>
               </div>
-              <p className="method-note">Estimates use EPA defaults and are not utility-certified measurements.</p>
+              <p className="method-note">Estimates use EPA regional grid data and DOE generalized water-energy ranges. They are not utility-certified measurements.</p>
             </article>
           </aside>
         </section>
@@ -341,10 +435,10 @@ export default function Home() {
 
         <section className="card records-card" id="records">
           <div className="card-header">
-            <div><h2>Recent usage records</h2><p>Demonstration and manually entered utility readings</p></div>
+            <div><h2>Recent usage records</h2><p>Manual and imported utility readings</p></div>
             {session.authenticated ? (
               <div className="record-actions">
-                <button className="secondary-button" onClick={() => { setShowImport((current) => !current); setShowForm(false); }}>{showImport ? "Close import" : "Import CSV"}</button>
+                <button className="secondary-button" onClick={() => { setShowImport((current) => !current); setShowForm(false); }}>{showImport ? "Close import" : "Import records"}</button>
                 <button className="primary-button" onClick={() => { setShowForm((current) => !current); setShowImport(false); }}>{showForm ? "Cancel" : "Add record"}</button>
               </div>
             ) : <a className="primary-button" href={signInPath}>Sign in to add records</a>}
@@ -353,19 +447,28 @@ export default function Home() {
             <section className="import-panel" aria-label="Import utility records">
               <div className="import-copy">
                 <strong>Import utility history</strong>
-                <p>Use columns <code>date, utility, usage, cost</code>. Dates must use YYYY-MM-DD; utility must be electricity, gas, or water.</p>
-                <a href="/greenmeter-import-template.csv" download>Download CSV template</a>
+                <p>Import GreenMeter&apos;s CSV template or a Green Button usage-data XML export from a participating utility.</p>
               </div>
+              <div className="import-format-tabs" role="tablist" aria-label="Import format">
+                <button type="button" role="tab" aria-selected={importFormat === "csv"} className={importFormat === "csv" ? "active" : ""} onClick={() => { setImportFormat("csv"); setImportPreview(null); setImportFileName(""); setImportContents(""); }}>CSV template</button>
+                <button type="button" role="tab" aria-selected={importFormat === "green_button"} className={importFormat === "green_button" ? "active" : ""} onClick={() => { setImportFormat("green_button"); setImportPreview(null); setImportFileName(""); setImportContents(""); }}>Green Button XML</button>
+              </div>
+              {importFormat === "csv" ? (
+                <p className="import-guidance">Use columns <code>date, utility, usage, cost</code>. Dates use YYYY-MM-DD. <a href="/greenmeter-import-template.csv" download>Download CSV template</a></p>
+              ) : (
+                <p className="import-guidance">Export “Download My Data” from your utility in Green Button XML format. GreenMeter converts supported interval readings into daily totals. The original file is not stored.</p>
+              )}
               <label className="file-picker">
-                <span>{importFileName || "Choose a CSV file"}</span>
-                <input type="file" accept=".csv,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void previewImport(file); }} />
+                <span>{importFileName || (importFormat === "csv" ? "Choose a CSV file" : "Choose a Green Button XML file")}</span>
+                <input key={importFormat} type="file" accept={importFormat === "csv" ? ".csv,text/csv" : ".xml,application/xml,text/xml"} onChange={(event) => { const file = event.target.files?.[0]; if (file) void previewImport(file); }} />
               </label>
               {importing && <p className="import-status" role="status">Checking file…</p>}
               {importPreview && (
                 <div className={`import-result ${importPreview.errors.length ? "has-errors" : ""}`}>
                   <strong>{importPreview.errors.length ? `${importPreview.errors.length} issues found` : `${importPreview.rows.length} records ready to import`}</strong>
-                  <span>{importPreview.totalRows} data rows checked</span>
-                  {importPreview.errors.length > 0 && <ul>{importPreview.errors.slice(0, 8).map((error, index) => <li key={`${error.row}-${index}`}>Row {error.row}: {error.message}</li>)}</ul>}
+                  <span>{importFormat === "green_button" && importPreview.totalIntervals !== undefined ? `${importPreview.totalIntervals} interval readings checked and grouped into ${importPreview.totalRows} daily records` : `${importPreview.totalRows} data rows checked`}</span>
+                  {importPreview.warnings?.map((warning) => <p className="import-warning" key={warning}>{warning}</p>)}
+                  {importPreview.errors.length > 0 && <ul>{importPreview.errors.slice(0, 8).map((error, index) => <li key={`${error.row ?? error.entry}-${index}`}>{error.row ? `Row ${error.row}` : `Entry ${error.entry ?? index + 1}`}: {error.message}</li>)}</ul>}
                   {importPreview.errors.length === 0 && <button className="primary-button" disabled={importing} onClick={() => void confirmImport()}>{importing ? "Importing…" : `Import ${importPreview.rows.length} records`}</button>}
                 </div>
               )}
@@ -390,7 +493,7 @@ export default function Home() {
                 {records.slice(0, 6).map((record) => (
                   <tr key={record.id}>
                     <td>{new Date(`${record.date}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
-                    <td><span className={`utility-mark ${record.category.toLowerCase()}`} />{record.category}</td>
+                    <td><span className={`table-utility-icon ${record.category.toLowerCase()}`}><UtilityIcon utility={record.category} /></span>{record.category}</td>
                     <td>{record.amount} {record.unit}</td><td>${record.cost.toFixed(2)}</td><td><span className="source-badge">{record.source}</span></td>
                   </tr>
                 ))}

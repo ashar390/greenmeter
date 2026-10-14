@@ -1,5 +1,5 @@
 export type UtilityType = "electricity" | "gas" | "water";
-export type UsageSource = "manual" | "demo_data" | "utility_sync" | "csv_import";
+export type UsageSource = "manual" | "demo_data" | "utility_sync" | "csv_import" | "green_button";
 
 export type UsageRecordDto = {
   id: number;
@@ -8,7 +8,7 @@ export type UsageRecordDto = {
   amount: number;
   unit: "kWh" | "therms" | "gal";
   cost: number;
-  source: "Manual" | "Demo data" | "Utility sync" | "CSV import";
+  source: "Manual" | "Demo data" | "Utility sync" | "CSV import" | "Green Button";
 };
 
 export type NewUsageRecordInput = {
@@ -38,6 +38,7 @@ const sourceLabels = {
   demo_data: "Demo data",
   utility_sync: "Utility sync",
   csv_import: "CSV import",
+  green_button: "Green Button",
 } as const;
 
 type UsageRow = {
@@ -79,7 +80,7 @@ async function getDemoHouseholdId(database: D1Database) {
   return household.id;
 }
 
-async function getOrCreateHousehold(database: D1Database, ownerUserId?: string, ownerName?: string) {
+export async function getOrCreateHousehold(database: D1Database, ownerUserId?: string, ownerName?: string) {
   if (!ownerUserId) return getDemoHouseholdId(database);
 
   const existing = await database
@@ -150,6 +151,7 @@ export async function insertUsageRecords(
   inputs: NewUsageRecordInput[],
   ownerUserId: string,
   ownerName?: string,
+  source: "csv_import" | "green_button" = "csv_import",
 ) {
   const householdId = await getOrCreateHousehold(database, ownerUserId, ownerName);
   if (inputs.length === 0) return [];
@@ -157,7 +159,7 @@ export async function insertUsageRecords(
   await database.batch(inputs.map((input) => database.prepare(`
     INSERT INTO usage_records
       (household_id, utility_type, reading_date, amount, unit, cost_cents, source)
-    VALUES (?, ?, ?, ?, ?, ?, 'csv_import')
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     householdId,
     input.category,
@@ -165,6 +167,7 @@ export async function insertUsageRecords(
     input.amount,
     units[input.category],
     input.costCents,
+    source,
   )));
 
   return listUsageRecords(database, ownerUserId, ownerName);

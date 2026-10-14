@@ -1,4 +1,4 @@
-import { estimateEmissions, type EmissionsEstimate } from "./emissions.ts";
+import { estimateEmissions, type EgridRegionCode, type EmissionsEstimate, type WaterSource } from "./emissions.ts";
 
 export type ReportingPeriod = "current" | "previous" | "last12";
 
@@ -18,7 +18,7 @@ export type UtilityTotal = {
   changePercent: number | null;
 };
 
-export type ElectricityDay = {
+export type UtilityDay = {
   date: string;
   amount: number;
   label: string;
@@ -35,7 +35,11 @@ export type DashboardSummary = {
   water: UtilityTotal;
   gas: UtilityTotal;
   emissions: EmissionsEstimate & { changePercent: number | null };
-  electricityDays: ElectricityDay[];
+  electricityDays: UtilityDay[];
+  utilityDays: Record<DashboardUsageRecord["category"], UtilityDay[]>;
+  utilityAverages: Record<DashboardUsageRecord["category"], number | null>;
+  utilityHighest: Record<DashboardUsageRecord["category"], number | null>;
+  utilityChartMaximum: Record<DashboardUsageRecord["category"], number>;
   electricityAverage: number | null;
   electricityHighest: number | null;
   chartMaximum: number;
@@ -97,6 +101,7 @@ function formatDateRange(start: Date, end: Date) {
 export function calculateDashboardSummary(
   records: DashboardUsageRecord[],
   period: ReportingPeriod,
+  emissionsProfile: { region: EgridRegionCode; waterSource: WaterSource } = { region: "AZNM", waterSource: "local_surface" },
 ): DashboardSummary {
   const latestDate = records.length
     ? records.reduce((latest, record) => record.date > latest ? record.date : latest, records[0].date)
@@ -119,19 +124,27 @@ export function calculateDashboardSummary(
   const electricity = totalFor(currentRecords, "Electricity");
   const water = totalFor(currentRecords, "Water");
   const gas = totalFor(currentRecords, "Gas");
-  const emissions = estimateEmissions(electricity, gas);
+  const emissions = estimateEmissions(electricity, gas, water, emissionsProfile.region, emissionsProfile.waterSource);
   const comparisonEmissions = estimateEmissions(
     totalFor(comparisonRecords, "Electricity"),
     totalFor(comparisonRecords, "Gas"),
+    totalFor(comparisonRecords, "Water"),
+    emissionsProfile.region,
+    emissionsProfile.waterSource,
   );
-  const electricityDays = currentRecords
-    .filter((record) => record.category === "Electricity")
+  const utilityDays = Object.fromEntries(["Electricity", "Water", "Gas"].map((category) => [category, currentRecords
+    .filter((record) => record.category === category)
     .sort((left, right) => left.date.localeCompare(right.date))
     .map((record) => ({
       date: record.date,
       amount: record.amount,
       label: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(parseDate(record.date)),
-    }));
+    }))])) as DashboardSummary["utilityDays"];
+  const electricityDays = utilityDays.Electricity;
+  const totals = { Electricity: electricity, Water: water, Gas: gas };
+  const utilityAverages = Object.fromEntries(Object.entries(utilityDays).map(([category, days]) => [category, days.length ? round(totals[category as keyof typeof totals] / days.length) : null])) as DashboardSummary["utilityAverages"];
+  const utilityHighest = Object.fromEntries(Object.entries(utilityDays).map(([category, days]) => [category, days.length ? round(Math.max(...days.map((record) => record.amount))) : null])) as DashboardSummary["utilityHighest"];
+  const utilityChartMaximum = Object.fromEntries(Object.entries(utilityHighest).map(([category, highest]) => [category, highest === null ? 10 : Math.max(10, Math.ceil(highest / 10) * 10)])) as DashboardSummary["utilityChartMaximum"];
   const uniqueDays = new Set(currentRecords.map((record) => record.date)).size;
   const daysInPeriod = Math.round((periodEnd.valueOf() - periodStart.valueOf()) / 86_400_000) + 1;
   const electricityHighest = electricityDays.length
@@ -165,8 +178,12 @@ export function calculateDashboardSummary(
       changePercent: changePercent(emissions.totalKg, comparisonEmissions.totalKg),
     },
     electricityDays,
-    electricityAverage: electricityDays.length ? round(electricity / electricityDays.length) : null,
+    utilityDays,
+    utilityAverages,
+    utilityHighest,
+    utilityChartMaximum,
+    electricityAverage: utilityAverages.Electricity,
     electricityHighest: electricityHighest === null ? null : round(electricityHighest),
-    chartMaximum: electricityHighest === null ? 10 : Math.max(10, Math.ceil(electricityHighest / 10) * 10),
+    chartMaximum: utilityChartMaximum.Electricity,
   };
 }

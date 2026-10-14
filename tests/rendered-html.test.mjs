@@ -22,7 +22,7 @@ test("server-renders the GreenMeter dashboard with its intro", async () => {
   const html = await response.text();
   assert.match(html, /<title>GreenMeter \| Household Energy Insights<\/title>/i);
   assert.match(html, /GreenMeter introduction/);
-  assert.match(html, /Energy overview/);
+  assert.match(html, /Your home,/);
   assert.match(html, /Recent usage records/);
   assert.match(html, /Exploring the public demo/);
   assert.match(html, /Sign in to add records/);
@@ -32,11 +32,11 @@ test("keeps the direct dashboard route available", async () => {
   const response = await render("/dashboard");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Energy overview/);
+  assert.match(html, /Your home,/);
   assert.match(html, /Estimated household emissions/);
   assert.match(html, /How this estimate works/);
   assert.match(html, /Latest recorded month/);
-  assert.match(html, /Electricity usage/);
+  assert.match(html, /Utility usage trend/);
   assert.match(html, /Recent usage records/);
 });
 

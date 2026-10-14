@@ -41,7 +41,7 @@ test("migration creates the expected GreenMeter tables", async () => {
 
   assert.deepEqual(tables, ["accounts", "households", "password_credentials", "reduction_goals", "sessions", "usage_records", "users", "verification_tokens"]);
   const columns = database.prepare("PRAGMA table_info(households)").all().map((column) => column.name);
-  assert.deepEqual(columns, ["id", "name", "address", "owner_user_id", "created_at"]);
+  assert.deepEqual(columns, ["id", "name", "address", "owner_user_id", "city", "state_code", "postal_code", "egrid_subregion", "water_source", "created_at"]);
   database.close();
 });
 
@@ -147,6 +147,7 @@ test("usage records enforce valid amounts, costs, categories, and uniqueness", a
   );
 
   insert.run(householdId, "gas", "2026-09-22", 1, "therms", 120, "csv_import");
+  insert.run(householdId, "water", "2026-09-23", 100, "gal", 75, "green_button");
 
   database.close();
 });

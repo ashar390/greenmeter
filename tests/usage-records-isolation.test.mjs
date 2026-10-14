@@ -94,3 +94,15 @@ test("bulk imports are attributed to the authenticated household and CSV source"
 
   sqlite.close();
 });
+
+test("Green Button imports retain their source label", async () => {
+  const { sqlite, database } = await createD1Adapter();
+  sqlite.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("green-button-user", "Utility User", "utility@example.com");
+
+  const records = await insertUsageRecords(database, [
+    { date: "2026-10-03", category: "gas", amount: 1.2, costCents: 145 },
+  ], "green-button-user", "Utility User", "green_button");
+
+  assert.equal(records[0].source, "Green Button");
+  sqlite.close();
+});

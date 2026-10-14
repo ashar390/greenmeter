@@ -1,6 +1,6 @@
 # GreenMeter
 
-GreenMeter is a full-stack household utility tracking application that brings electricity, water, and natural-gas records into one private dashboard. Users can enter readings individually or import a CSV, review billing-period totals and trends, and estimate household emissions using documented U.S. Environmental Protection Agency factors.
+GreenMeter is a full-stack household utility tracking application that brings electricity, water, and natural-gas records into one private dashboard. Users can enter readings individually, import GreenMeter CSV files, or load standard Green Button XML exports from participating utilities. Imported records feed the same billing-period totals, trends, and regional emissions estimates as manually entered readings.
 
 **Live application:** [greenmeter.anusha-sharma.workers.dev](https://greenmeter.anusha-sharma.workers.dev)
 
@@ -29,11 +29,14 @@ Implemented:
 - Versioned D1/SQLite schema for households, usage records, and reduction goals
 - REST-style read and write API
 - EPA-based electricity and natural-gas emissions estimates
+- Private household location settings with selectable EPA eGRID region
+- Water-supply emissions estimates using documented DOE energy ranges and the selected regional grid factor
 - Public read-only demonstration mode
 - Email/password accounts with salted PBKDF2 password hashing
 - Optional GitHub OAuth sign-in
 - Authenticated household workspaces with server-side record isolation by account ID
 - Validated CSV import with preview, row-level errors, and source tracking
+- Green Button ESPI XML import with interval-to-daily aggregation, unit conversion, validation, and source tracking
 - Explicit, repeatable database migrations and demonstration-data seeding
 - Database readiness endpoint at `/api/health`
 - Unit, schema, and production-render tests
@@ -42,7 +45,6 @@ Implemented:
 Not implemented yet:
 
 - Direct utility-company API integrations
-- Water emissions calculations
 
 ## Start locally
 
@@ -116,12 +118,12 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a beginner-friendly explan
 
 ## Emissions methodology
 
-- Electricity uses the EPA eGRID2023 AZNM total output rate for the WECC Southwest region.
+- Electricity uses the household's selected EPA eGRID2023 subregion total-output rate.
 - Natural gas uses the EPA 2025 stationary-combustion factors, converted to kilograms of CO2e per therm.
-- Water is intentionally excluded until a defensible regional factor is selected.
+- Water uses the DOE generalized energy range for the selected supply type and the household's eGRID electricity factor. GreenMeter uses the midpoint of the published range and displays that assumption in the dashboard.
 
 These results are estimates based on recorded activity and are not utility-certified measurements.
 
 ## Next milestone
 
-Add a production-ready utility-provider integration while preserving manual entry and CSV import as reliable alternatives.
+Expand Green Button interoperability coverage and add representative provider fixtures while preserving manual entry and CSV import as reliable alternatives.
