@@ -42,6 +42,19 @@ export const verificationTokens = sqliteTable("verification_tokens", {
   expires: text("expires").notNull(),
 });
 
+export const passwordCredentials = sqliteTable("password_credentials", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: text("password_hash").notNull(),
+  salt: text("salt").notNull(),
+  iterations: integer("iterations").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  check("password_credentials_hash_not_blank", sql`length(${table.passwordHash}) > 0`),
+  check("password_credentials_salt_not_blank", sql`length(${table.salt}) > 0`),
+  check("password_credentials_iterations_secure", sql`${table.iterations} >= 100000`),
+]);
+
 export const households = sqliteTable("households", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),

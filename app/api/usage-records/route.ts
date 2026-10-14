@@ -1,7 +1,6 @@
 import { insertUsageRecord, listUsageRecords, type UtilityType } from "../../../db/usage-records";
 import { getDatabase } from "../../../db/client";
-import { auth } from "../../../auth";
-import { getSessionUser } from "../../../lib/session-user";
+import { getRequestUser } from "../../../lib/request-session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +12,9 @@ function isIsoDate(value: unknown): value is string {
   return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const user = getSessionUser(await auth());
+    const user = await getRequestUser(request);
     const records = await listUsageRecords(await getDatabase(), user?.id, user?.displayName);
     return Response.json({ records, mode: user ? "personal" : "demo" });
   } catch (error) {
@@ -26,7 +25,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = getSessionUser(await auth());
+    const user = await getRequestUser(request);
     if (!user) {
       return Response.json(
         { error: "Sign in to add records to a private household." },

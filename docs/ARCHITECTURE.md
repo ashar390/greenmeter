@@ -160,6 +160,9 @@ households
 users, accounts, sessions, verification_tokens
   account identity and database-backed sessions
 
+password_credentials
+  salted password hashes for users who register with email
+
 usage_records
   id, household_id, utility_type, reading_date,
   amount, unit, cost_cents, source, created_at
@@ -173,15 +176,17 @@ Money will be stored as integer cents rather than decimal dollars. Integer stora
 
 ## 7. Authentication and authorization
 
-GreenMeter uses **Auth.js** with GitHub OAuth. OAuth means GitHub verifies the
-user; GreenMeter never receives or stores the user's GitHub password. Auth.js
-creates a secure session cookie and stores the associated account and session
-records in D1.
+GreenMeter supports application-owned email/password accounts and optional
+GitHub OAuth. Email passwords are processed only on the server and stored as
+salted PBKDF2-SHA-256 hashes with 210,000 iterations—never as readable text.
+With OAuth, GitHub verifies the user, so GreenMeter never receives the user's
+GitHub password. Both methods create the same kind of opaque session cookie and
+store the associated session record in D1.
 
 Authentication answers “who is making this request?” Authorization answers
 “what may that user access?” GreenMeter performs both checks on the server:
 
-1. Auth.js validates the session cookie.
+1. The API reads the opaque session token from the secure, HTTP-only cookie.
 2. The API reads the authenticated user's stable account ID.
 3. Database queries locate the household owned by that account ID.
 4. Reads and writes are restricted to that household.
@@ -239,15 +244,19 @@ Greenmeter/
 │   ├── dashboard/page.tsx
 │   ├── sign-in/page.tsx
 │   ├── api/auth/[...nextauth]/route.ts
+│   ├── api/auth/register/route.ts
+│   ├── api/auth/email-session/route.ts
 │   ├── api/session/route.ts
 │   ├── api/usage-records/route.ts
 │   └── globals.css       # Visual system and responsive styles
 ├── db/
-│   ├── schema.ts         # Typed definitions for the three SQL tables
+│   ├── schema.ts         # Typed definitions for the SQL tables
 │   └── usage-records.ts  # Prepared queries and row-to-API mapping
 ├── lib/
 │   ├── dashboard-summary.ts # Pure totals, comparisons, and chart calculations
 │   ├── emissions.ts       # EPA factors and emissions calculation
+│   ├── password.ts        # Password validation, hashing, and verification
+│   ├── request-session.ts # Server-side session-cookie validation
 │   └── session-user.ts    # Validated application-session identity
 ├── drizzle/
 │   ├── 0000_*.sql        # Versioned SQL migration generated from the schema
@@ -259,7 +268,7 @@ Greenmeter/
 ├── tests/
 │   └── rendered-html.test.mjs
 ├── package.json          # Dependencies and development commands
-├── auth.ts               # OAuth and D1 session configuration
+├── auth.ts               # GitHub OAuth and D1 session configuration
 ├── wrangler.jsonc        # Worker, asset, and D1 deployment bindings
 └── vite.config.ts        # Build and Cloudflare configuration
 ```

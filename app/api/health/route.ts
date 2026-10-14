@@ -9,7 +9,7 @@ export async function GET() {
       SELECT COUNT(*) AS count
       FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('users', 'accounts', 'sessions', 'verification_tokens', 'households', 'usage_records', 'reduction_goals')
+        AND name IN ('users', 'accounts', 'sessions', 'verification_tokens', 'password_credentials', 'households', 'usage_records', 'reduction_goals')
     `).first<{ count: number }>();
     const demo = await database.prepare(`
       SELECT COUNT(*) AS count
@@ -19,7 +19,7 @@ export async function GET() {
         AND owner_user_id IS NULL
     `).first<{ count: number }>();
 
-    if (schema?.count !== 7 || demo?.count !== 1) {
+    if (schema?.count !== 8 || demo?.count !== 1) {
       return Response.json(
         { status: "unavailable", database: "incomplete" },
         { status: 503, headers: { "cache-control": "no-store" } },

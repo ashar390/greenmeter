@@ -1,15 +1,14 @@
 import { insertUsageRecords } from "../../../../db/usage-records";
 import { getDatabase } from "../../../../db/client";
 import { parseUsageCsv } from "../../../../lib/csv-import";
-import { auth } from "../../../../auth";
-import { getSessionUser } from "../../../../lib/session-user";
+import { getRequestUser } from "../../../../lib/request-session";
 
 export const dynamic = "force-dynamic";
 
 const MAXIMUM_FILE_BYTES = 1_000_000;
 
 export async function POST(request: Request) {
-  const user = getSessionUser(await auth());
+  const user = await getRequestUser(request);
   if (!user) return Response.json({ error: "Sign in to import records." }, { status: 401 });
 
   try {

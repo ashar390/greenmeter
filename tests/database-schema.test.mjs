@@ -39,9 +39,37 @@ test("migration creates the expected GreenMeter tables", async () => {
     .all()
     .map((row) => row.name);
 
-  assert.deepEqual(tables, ["accounts", "households", "reduction_goals", "sessions", "usage_records", "users", "verification_tokens"]);
+  assert.deepEqual(tables, ["accounts", "households", "password_credentials", "reduction_goals", "sessions", "usage_records", "users", "verification_tokens"]);
   const columns = database.prepare("PRAGMA table_info(households)").all().map((column) => column.name);
   assert.deepEqual(columns, ["id", "name", "address", "owner_user_id", "created_at"]);
+  database.close();
+});
+
+test("password credentials store hashes separately from user profiles", async () => {
+  const database = await createDatabase();
+  database.prepare("INSERT INTO users (id, name, email) VALUES (?, ?, ?)").run("email-user", "Email User", "email@example.com");
+  database.prepare(`
+    INSERT INTO password_credentials (user_id, password_hash, salt, iterations)
+    VALUES (?, ?, ?, ?)
+  `).run("email-user", "stored-hash", "stored-salt", 210000);
+
+  const credential = database.prepare("SELECT * FROM password_credentials WHERE user_id = ?").get("email-user");
+  assert.equal(credential.password_hash, "stored-hash");
+  assert.equal(credential.iterations, 210000);
+  assert.throws(
+    () => database.prepare(`
+      INSERT INTO password_credentials (user_id, password_hash, salt, iterations)
+      VALUES (?, ?, ?, ?)
+    `).run("email-user", "another-hash", "another-salt", 210000),
+    /UNIQUE constraint failed/,
+  );
+  assert.throws(
+    () => database.prepare(`
+      INSERT INTO password_credentials (user_id, password_hash, salt, iterations)
+      VALUES (?, ?, ?, ?)
+    `).run("missing-user", "stored-hash", "stored-salt", 210000),
+    /FOREIGN KEY constraint failed/,
+  );
   database.close();
 });
 

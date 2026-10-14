@@ -44,9 +44,11 @@ test("renders the account sign-in page", async () => {
   const response = await render("/sign-in");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Sign in to save your utility history/);
+  assert.match(html, /Welcome back/);
+  assert.match(html, /Create account/);
+  assert.match(html, /Email address/);
   assert.match(html, /Continue with GitHub/);
-  assert.match(html, /does not receive your GitHub password/);
+  assert.match(html, /never receives your GitHub password/);
 });
 
 test("includes production project configuration and assets", async () => {

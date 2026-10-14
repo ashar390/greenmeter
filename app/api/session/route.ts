@@ -1,10 +1,9 @@
-import { auth } from "../../../auth";
-import { getSessionUser } from "../../../lib/session-user";
+import { getRequestUser } from "../../../lib/request-session";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const user = getSessionUser(await auth());
+export async function GET(request: Request) {
+  const user = await getRequestUser(request);
 
   return Response.json({
     authenticated: Boolean(user),

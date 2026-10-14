@@ -4,14 +4,14 @@ GreenMeter is a full-stack household utility tracking application that brings el
 
 **Live application:** [greenmeter.anusha-sharma.workers.dev](https://greenmeter.anusha-sharma.workers.dev)
 
-The public demo can be explored without an account. GitHub sign-in creates a private household workspace whose records are isolated from other users on the server.
+The public demo can be explored without an account. Users can create an email/password account or use GitHub sign-in; either method creates a private household workspace whose records are isolated from other users on the server.
 
 ## Technology
 
 - **Frontend:** React, TypeScript, and CSS
 - **Application runtime:** Cloudflare Workers
 - **Database:** Cloudflare D1 (SQLite) with versioned SQL migrations
-- **Authentication:** Auth.js with GitHub OAuth and database-backed sessions
+- **Authentication:** Auth.js with email/password and optional GitHub OAuth
 - **Testing:** Vitest and production-render checks
 
 ## Current milestone
@@ -30,7 +30,8 @@ Implemented:
 - REST-style read and write API
 - EPA-based electricity and natural-gas emissions estimates
 - Public read-only demonstration mode
-- GitHub OAuth with database-backed sessions
+- Email/password accounts with salted PBKDF2 password hashing
+- Optional GitHub OAuth sign-in
 - Authenticated household workspaces with server-side record isolation by account ID
 - Validated CSV import with preview, row-level errors, and source tracking
 - Explicit, repeatable database migrations and demonstration-data seeding
@@ -53,10 +54,10 @@ npm run dev
 
 Open the local address printed in the terminal.
 
-Copy `.dev.vars.example` to `.dev.vars` and provide an Auth.js secret plus the
-credentials from a GitHub OAuth application. Keep `.dev.vars` private; it is
-ignored by Git. For local development, set the OAuth callback URL to
-`http://localhost:3000/api/auth/callback/github`.
+Copy `.dev.vars.example` to `.dev.vars` and provide an Auth.js secret. Keep
+`.dev.vars` private; it is ignored by Git. To test optional GitHub sign-in,
+also provide credentials from a GitHub OAuth application and set its local
+callback URL to `http://localhost:3000/api/auth/callback/github`.
 
 ## Verify the project
 

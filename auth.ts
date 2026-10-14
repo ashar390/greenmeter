@@ -26,9 +26,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth(async () => {
     trustHost: true,
     callbacks: {
       session({ session, user }) {
-        if (session.user) {
-          (session.user as typeof session.user & { id: string }).id = user.id;
-        }
+        session.user = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        } as typeof session.user & { id: string };
         return session;
       },
     },
