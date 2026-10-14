@@ -114,7 +114,7 @@ export async function listUsageRecords(
     FROM usage_records
     WHERE household_id = ?
     ORDER BY reading_date DESC, id DESC
-    LIMIT 50
+    LIMIT 1000
   `).bind(householdId).all<UsageRow>();
 
   return result.results.map(toDto);

@@ -110,7 +110,7 @@ test("demonstration seed is explicit and idempotent", async () => {
   `).get();
 
   assert.equal(demoHouseholds.count, 1);
-  assert.equal(demoRecords.count, 5);
+  assert.equal(demoRecords.count, 60);
   database.close();
 });
 
