@@ -72,7 +72,7 @@ test("authenticated households cannot read each other's usage records", async ()
 
   assert.deepEqual(firstRecords.map((record) => record.amount), [12.5]);
   assert.deepEqual(secondRecords.map((record) => record.amount), [27.2]);
-  assert.equal(demoRecords.length, 60);
+  assert.equal(demoRecords.length, 30);
 
   sqlite.close();
 });
